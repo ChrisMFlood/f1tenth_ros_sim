@@ -47,63 +47,39 @@ sudo TRACE=ON python3 setup.py install
 
 ```python
 def publish_scan(self, angles, ranges):
-
 # publish the given angels and ranges as a laser scan message
-
 ls = LaserScan()
-
 ls.header.stamp = self.last_stamp
-
 ls.header.frame_id = '/laser'
-
 ls.angle_min = float(np.min(angles))
-
 ls.angle_max = float(np.max(angles))
-
 ls.angle_increment = float(np.abs(angles[0] - angles[1]))
-
 ls.range_min = 0.0
-
 ls.range_max = float(np.max(ranges))
-
-# ls.ranges = ranges
-
 ls.ranges = [float(range) for range in ranges]
-
 self.pub_fake_scan.publish(ls)
 ```
+To be continued
 
-# 5. Usage with Imings pure pursuit
-In terminal 1:
-```bash
-ros2 launch f1tenth_gym_ros gym_bridge_launch.py
-```
-In terminal 2:
-```bash
-ros2 launch particle_filter localize_launch.py
-```
-In terminal 3:
-Navigate to correct directory:
-```bash
-cd Ros2PP/src/my_waypoint_follower/my_waypoint_follower/
-```
-The run:
-```bash
-ros2 run my_waypoint_follower purePursuit_ros
-```
-```bash
-
-```
 # Launch
 ## Bridge
 ```bash
 ros2 launch f1tenth_gym_ros gym_bridge_launch.py
 ```
 ## Particle Filter
-```
+```bash
 ros2 launch particle_filter localize_launch.py
 ```
 ## Tests
+# Topics to subscribe to:
+## Perception:
+- /scan: scan from lidar
+- /ego_racecar/odom: exact position or the car
+## Planning
+## Control
+## Misc
+- /ego_crash: True if collision occurs
+
 # Tests
 # Create Custom Components
 # Simulation to RL
