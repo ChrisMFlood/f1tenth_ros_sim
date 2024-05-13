@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'localisation_tests'
+package_name = 'benchmark_tests'
 
 setup(
     name=package_name,
@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            "localisation_test_accuracy = benchmark_tests.localisation_test_accuracy:main",
         ],
     },
 )
