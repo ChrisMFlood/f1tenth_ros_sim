@@ -1,4 +1,9 @@
 # Download
+## Quick Start
+```bash
+git clone
+colcon buld
+```
 ## F1tenth Bridge
 ```bash
 cd $HOME
@@ -43,7 +48,7 @@ cd range_libc/pywrapper
 ./compile.sh
 sudo TRACE=ON python3 setup.py install
 ```
-# Fix to visualise fake scan
+#### Fix to visualise "fake" scan
 
 ```python
 def publish_scan(self, angles, ranges):
@@ -71,6 +76,12 @@ ros2 launch f1tenth_gym_ros gym_bridge_launch.py
 ros2 launch particle_filter localize_launch.py
 ```
 ## Tests
+# Packages
+## f1tenth_gym_ros
+## f110_car_control
+## f10_interfaces
+## localisation_test
+## particle_filter
 # Topics to subscribe to:
 ## Perception:
 - /scan: scan from lidar
@@ -81,6 +92,8 @@ ros2 launch particle_filter localize_launch.py
 - /ego_crash: True if collision occurs
 
 # Tests
+## 
 # Create Custom Components
 # Simulation to RL
+# References
 
