@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            "start_position = f110_car_control.start_position:main",
         ],
     },
 )
