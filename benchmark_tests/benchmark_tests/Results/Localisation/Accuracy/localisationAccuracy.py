@@ -1,67 +1,207 @@
-import csv
 import numpy as np
+from math import sqrt
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import csv, yaml
+from PIL import Image
+from matplotlib.collections import LineCollection
 
+class MapData:
+    def __init__(self, map_name):
+        self.map_name = map_name
+
+        self.map_resolution = None
+        self.map_origin = None
+        self.map_img = None
+        self.map_height = None
+        self.map_width = None
+
+        try:
+            self.path = "/home/chris/Ros2PP/src/my_waypoint_follower/my_waypoint_follower/maps/"
+            self.load_map_img()
+        except:
+            self.path = "../maps/"
+            self.load_map_img()
+
+    def load_map_img(self):
+        with open(self.path + self.map_name + ".yaml", 'r') as file:
+            map_yaml_data = yaml.safe_load(file)
+            self.map_resolution = map_yaml_data["resolution"]
+            self.map_origin = map_yaml_data["origin"]
+            map_img_name = map_yaml_data["image"]
+
+        self.map_img = np.array(Image.open(self.path + map_img_name).transpose(Image.FLIP_TOP_BOTTOM))
+        self.map_img = self.map_img.astype(np.float64)
+        if len(self.map_img.shape) > 2:
+            self.map_img = self.map_img[:, :, 0]
+
+        self.map_img[self.map_img <= 128.] = 0.
+        self.map_img[self.map_img > 128.] = 1.
+
+        self.map_height = self.map_img.shape[0]
+        self.map_width = self.map_img.shape[1]
+        
+    def xy2rc(self, xs, ys):
+        xs = (xs - self.map_origin[0]) / self.map_resolution
+        ys = (ys - self.map_origin[1]) /self.map_resolution
+        return xs, ys
+
+    def pts2rc(self, pts):
+        return self.xy2rc(pts[:,0], pts[:,1])
+    
+    def plot_map_img(self):
+        self.map_img[self.map_img == 1] = 180
+        self.map_img[self.map_img == 0 ] = 230
+        self.map_img[0, 1] = 255
+        self.map_img[0, 0] = 0
+        plt.imshow(self.map_img, origin='lower', cmap='gray')
+
+    def plot_map_img_left_right_flip(self):
+        self.map_img[self.map_img == 1] = 180
+        self.map_img[self.map_img == 0 ] = 230
+        self.map_img[0, 1] = 255
+        self.map_img[0, 0] = 0
+        map_img = np.fliplr(self.map_img)
+        plt.imshow(map_img, origin='lower', cmap='gray')
+
+    def plot_map_img_T(self):
+        self.map_img[self.map_img == 1] = 180
+        self.map_img[self.map_img == 0 ] = 230
+        self.map_img[0, 1] = 255
+        self.map_img[0, 0] = 0
+        map_img = np.transpose(self.map_img)
+        plt.imshow(map_img, origin='lower', cmap='gray')
+
+    def plot_map_img_rotate(self, k):
+        self.map_img[self.map_img == 1] = 180
+        self.map_img[self.map_img == 0 ] = 230
+        self.map_img[0, 1] = 255
+        self.map_img[0, 0] = 0
+        map_img = np.rot90(self.map_img, k=k)
+        plt.imshow(map_img, origin='lower', cmap='gray')
+
+    def get_formatted_img(self):
+        self.map_img[self.map_img == 1] = 180
+        self.map_img[self.map_img == 0 ] = 230
+        self.map_img[0, 1] = 255
+        self.map_img[0, 0] = 0
+
+        return self.map_img
+
+    def plot_map_img_light_T(self):
+        self.map_img[self.map_img == 1] = 220
+        self.map_img[self.map_img == 0 ] = 255
+        self.map_img[0, 1] = 255
+        self.map_img[0, 0] = 0
+        map_img = np.transpose(self.map_img)
+        plt.imshow(map_img, origin='lower', cmap='gray')
+
+    def plot_map_img_light(self):
+        self.map_img[self.map_img == 1] = 220
+        self.map_img[self.map_img == 0 ] = 255
+        self.map_img[0, 1] = 255
+        self.map_img[0, 0] = 0
+        plt.imshow(self.map_img, origin='lower', cmap='gray')
 
 def read_csv_file(file_path):
-    times = []
-    x = []
-    y = []
+    times = np.array([])
+    trueX = np.array([])
+    trueY = np.array([])
+    trueZ = np.array([])
+    trueW = np.array([])
+    pfX = np.array([])
+    pfY = np.array([])
+    pfZ = np.array([])
+    pfW = np.array([])
     with open(file_path, 'r') as file:
         reader = csv.reader(file)
         next(reader)  # Skip header if exists
         for row in reader:
-            if len(row) != 3:
-                raise ValueError("Each row must have exactly three columns")
-            times.append(float(row[0]))
-            x.append(float(row[1]))
-            y.append(float(row[2]))
-    first_time = times[0]
+            times = np.append(times, float(row[0])+(float(row[1])/1e9))
+            trueX = np.append(trueX, float(row[2]))
+            trueY = np.append(trueY, float(row[3]))
+            trueZ = np.append(trueZ, float(row[4]))
+            trueW = np.append(trueW, float(row[5]))
+            pfX = np.append(pfX, float(row[6]))
+            pfY = np.append(pfY, float(row[7]))
+            pfZ = np.append(pfZ, float(row[8]))
+            pfW = np.append(pfW, float(row[9]))
+    first_time = times[1]
     for i in range(len(times)):
         times[i] -= first_time
-    return times, x, y
+    truePosition = np.array([trueX, trueY])
+    pfPosition = np.array([pfX, pfY])
+    trueOrientation = trueW.reshape(1, -1)
+    pfOrientation = pfW.reshape(1, -1)
+    return times, truePosition, trueOrientation, pfPosition, pfOrientation
 
 
-trueOdomFilePath = '/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/trueOdom.csv' 
-pfOdomFilePath = '/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/pfOdom.csv'
+def rmse(arr1, arr2):
+    error = arr2-arr1
+    #rmse
+    squared_error = np.sum((error)**2,axis=0)
+    total_error = np.sum(squared_error)
+    rmse = sqrt(total_error/len(squared_error))
+    #abs error
+    abs_error = np.sqrt(squared_error)
+    #quartiles
+    upper_quartile = np.percentile(abs_error, 75)
+    upper_quartile_index = np.where(abs_error == upper_quartile)
+    print(upper_quartile)
+    print(upper_quartile_index)
+    lower_quartile = np.percentile(abs_error, 25)
+    lower_quartile_index = np.where(abs_error == lower_quartile)
+    print(lower_quartile)
+    print(lower_quartile_index)
+    median = np.percentile(abs_error, 50)
+    median_index = np.where(abs_error == median)
+    print(median)
+    print(median_index)
+    max_error = np.max(abs_error)
+    max_error_index = np.where(abs_error == max_error)
+    print(max_error)
+    print(max_error_index)
+    min_error = np.min(abs_error)
+    min_error_index = np.where(abs_error == min_error)
+    print(min_error)
+    print(min_error_index)
+    #outliers
+    iqr = upper_quartile - lower_quartile
+    upper_bound = upper_quartile + 1.5*iqr
+    lower_bound = lower_quartile - 1.5*iqr
+    outliers = abs_error[(abs_error > upper_bound) | (abs_error < lower_bound)]
+    print(outliers)
+    outlier_indices = np.where((abs_error > upper_bound) | (abs_error < lower_bound)) 
+    print("Outlier Indices:", outlier_indices)
 
-trueTimeLong, trueXLong, trueYLong = read_csv_file(trueOdomFilePath)
-pfTime, pfX, pfY = read_csv_file(pfOdomFilePath)
+    return rmse
 
-def find_closest_values(trueTime, trueX, trueY, pfTime):
-    '''
-    Find the indices of the closest times in the trueTime array to the times in the pfTime array.
-    Use for comparing the true and pf odometry data with different publishing rates.
-    '''
-    closest_times = []
-    closest_xs = []
-    closest_ys = []
-    for time in pfTime:
-        differences = np.abs(np.array(trueTime) - time)  # Calculate absolute differences
-        closest_index = np.argmin(differences)  # Find index of minimum difference
-        closest_times.append(trueTime[closest_index])
-        closest_xs.append(trueX[closest_index])
-        closest_ys.append(trueY[closest_index])
-    return closest_times, closest_xs, closest_ys
 
-trueTime, trueX, trueY = find_closest_values(trueTimeLong, trueXLong, trueYLong, pfTime)
-# for i in range(len(trueTime)):
-#     print(trueTime[i], trueX[i], trueY[i])  # Or do something else with the closest values
 
-# print(len(trueTime), len(pfTime))
-# for i in range(len(trueTime)):
-#     print(trueTime[i],  pfTime[i],i)  # Or do something else with the closest values
+def main():
 
-def compute_mean_euclidean_distance(pfX, pfY, trueX, trueY):
-        '''
-        Compute the mean Euclidean distance between the points (pfX[i], pfY[i]) and (trueX[i], trueY[i]).
-        '''
-        distances = []
-        for i in range(len(pfX)):
-            distance = np.sqrt((pfX[i] - trueX[i])**2 + (pfY[i] - trueY[i])**2)
-            print(distance)
-            distances.append(distance)
-        mean_distance = np.mean(distances)
-        return mean_distance
+    file_path = '/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/esp_1.csv'
+    time, truePosition, trueOrientation, pfPosition, pfOrientation = read_csv_file(file_path)
 
-mean_distance = compute_mean_euclidean_distance(pfX, pfY, trueX, trueY)
-print("Mean Euclidean Distance:", mean_distance)
+    position_rmse = rmse(truePosition, pfPosition)
+    print("Position RMSE:", position_rmse)
+    orientation_rmse = rmse(trueOrientation, pfOrientation)
+    print("Orientation RMSE:", orientation_rmse)
+
+    map_name = "esp"
+
+    map_data = MapData(map_name)
+    map_data.plot_map_img()
+    ox, oy = map_data.xy2rc(truePosition[0], truePosition[1])
+    pf, py = map_data.xy2rc(pfPosition[0], pfPosition[1])
+    plt.plot(ox, oy, label='True Position', color='blue', linewidth=1.5)
+    plt.plot(pf, py, label='PF Position', color='red', linestyle='dashed', linewidth=0.9)
+    plt.legend()
+    plt.savefig('/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/0_esp.png')
+
+
+    plt.show()
+
+if __name__ == '__main__':
+
+    main()
