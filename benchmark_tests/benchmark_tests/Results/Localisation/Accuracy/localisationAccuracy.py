@@ -131,13 +131,24 @@ def read_csv_file(file_path):
         times[i] -= first_time
     truePosition = np.array([trueX, trueY])
     pfPosition = np.array([pfX, pfY])
-    trueOrientation = trueW.reshape(1, -1)
-    pfOrientation = pfW.reshape(1, -1)
+    trueOrientation = np.array([trueZ,trueW]).reshape(2, -1)
+    pfOrientation = np.array([pfZ,pfW]).reshape(2, -1)
     return times, truePosition, trueOrientation, pfPosition, pfOrientation
 
 
-def rmse(arr1, arr2):
-    error = arr2-arr1
+def getError(arr1, arr2):
+    error = arr2 - arr1
+    return error
+
+
+def getAngleDiff(arr1,arr2):
+    magnitude1 = np.sqrt(arr1[0]**2 + arr1[1]**2).reshape(1,-1)
+    magnitude2 = np.sqrt(arr2[0]**2 + arr2[1]**2).reshape(1,-1)
+    dot = np.array([arr1[0]*arr2[0] + arr1[1]*arr2[1]]).reshape(1,-1)
+    angle = np.arccos(dot/(magnitude1*magnitude2))
+    return angle
+
+def errorAnalysis(error):
     #rmse
     squared_error = np.sum((error)**2,axis=0)
     total_error = np.sum(squared_error)
@@ -148,47 +159,51 @@ def rmse(arr1, arr2):
     upper_quartile = np.percentile(abs_error, 75)
     upper_quartile_index = np.where(abs_error == upper_quartile)
     print(upper_quartile)
-    print(upper_quartile_index)
+    # print(upper_quartile_index)
     lower_quartile = np.percentile(abs_error, 25)
     lower_quartile_index = np.where(abs_error == lower_quartile)
     print(lower_quartile)
-    print(lower_quartile_index)
+    # print(lower_quartile_index)
     median = np.percentile(abs_error, 50)
     median_index = np.where(abs_error == median)
     print(median)
-    print(median_index)
+    # print(median_index)
     max_error = np.max(abs_error)
     max_error_index = np.where(abs_error == max_error)
     print(max_error)
-    print(max_error_index)
+    # print(max_error_index)
     min_error = np.min(abs_error)
     min_error_index = np.where(abs_error == min_error)
     print(min_error)
-    print(min_error_index)
+    # print(min_error_index)
     #outliers
     iqr = upper_quartile - lower_quartile
     upper_bound = upper_quartile + 1.5*iqr
     lower_bound = lower_quartile - 1.5*iqr
     outliers = abs_error[(abs_error > upper_bound) | (abs_error < lower_bound)]
-    print(outliers)
+    # print("Outliers:", outliers)
+    print("#Outliers:", len(outliers))
     outlier_indices = np.where((abs_error > upper_bound) | (abs_error < lower_bound)) 
-    print("Outlier Indices:", outlier_indices)
+    # print("Outlier Indices:", outlier_indices)
 
     return rmse
 
-
-
 def main():
 
-    file_path = '/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/esp_1.csv'
+    file_path = '/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/gbr_1.csv'
     time, truePosition, trueOrientation, pfPosition, pfOrientation = read_csv_file(file_path)
 
-    position_rmse = rmse(truePosition, pfPosition)
+    position_rmse = errorAnalysis(getError(truePosition, pfPosition))
     print("Position RMSE:", position_rmse)
-    orientation_rmse = rmse(trueOrientation, pfOrientation)
-    print("Orientation RMSE:", orientation_rmse)
 
-    map_name = "esp"
+    orientation_rmse = errorAnalysis(getError(trueOrientation, pfOrientation))
+    print("Orientation RMSE:", orientation_rmse)
+    ang = getAngleDiff(trueOrientation, pfOrientation)
+    # print("Angle Diff:", ang)
+    ang_rmse = errorAnalysis(ang)
+    print("Angle RMSE:", ang_rmse)
+
+    map_name = "gbr"
 
     map_data = MapData(map_name)
     map_data.plot_map_img()
@@ -197,7 +212,7 @@ def main():
     plt.plot(ox, oy, label='True Position', color='blue', linewidth=1.5)
     plt.plot(pf, py, label='PF Position', color='red', linestyle='dashed', linewidth=0.9)
     plt.legend()
-    plt.savefig('/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/0_esp.png')
+    plt.savefig('/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/0_gbr.png')
 
 
     plt.show()
