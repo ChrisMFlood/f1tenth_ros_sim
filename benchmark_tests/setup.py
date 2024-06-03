@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             "localisation_test_accuracy = benchmark_tests.localisation_test_accuracy:main",
+            "scan_noise = benchmark_tests.scan_noise:main",
         ],
     },
 )

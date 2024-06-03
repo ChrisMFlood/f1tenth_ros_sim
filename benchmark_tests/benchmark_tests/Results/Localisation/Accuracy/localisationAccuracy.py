@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import csv, yaml
 from PIL import Image
 from matplotlib.collections import LineCollection
+from transforms3d import euler
 
 class MapData:
     def __init__(self, map_name):
@@ -107,33 +108,36 @@ def read_csv_file(file_path):
     times = np.array([])
     trueX = np.array([])
     trueY = np.array([])
-    trueZ = np.array([])
-    trueW = np.array([])
     pfX = np.array([])
     pfY = np.array([])
-    pfZ = np.array([])
-    pfW = np.array([])
+    trueAngle = np.array([])
+    pfAngle = np.array([])
+    trueOrientation = np.empty((0,3))
+    pfOrientation = np.empty((0,3))
     with open(file_path, 'r') as file:
         reader = csv.reader(file)
         next(reader)  # Skip header if exists
         for row in reader:
             times = np.append(times, float(row[0])+(float(row[1])/1e9))
+
             trueX = np.append(trueX, float(row[2]))
             trueY = np.append(trueY, float(row[3]))
-            trueZ = np.append(trueZ, float(row[4]))
-            trueW = np.append(trueW, float(row[5]))
+            trueVec,trueTheta=euler.quat2axangle([float(row[5]),0.0,0.0,float(row[4])])
+            trueAngle = np.append(trueAngle, trueTheta)
+            trueOrientation = np.append(trueOrientation, np.array(trueVec).reshape(1, -1), axis=0)
+
             pfX = np.append(pfX, float(row[6]))
             pfY = np.append(pfY, float(row[7]))
-            pfZ = np.append(pfZ, float(row[8]))
-            pfW = np.append(pfW, float(row[9]))
+            pfVec,pfTheta=euler.quat2axangle([float(row[9]),0.0,0.0,float(row[8])])
+            pfAngle = np.append(pfAngle, pfTheta)
+            pfOrientation = np.append(pfOrientation, np.array(pfVec).reshape(1, -1), axis = 0)
+
     first_time = times[1]
     for i in range(len(times)):
         times[i] -= first_time
     truePosition = np.array([trueX, trueY])
     pfPosition = np.array([pfX, pfY])
-    trueOrientation = np.array([trueZ,trueW]).reshape(2, -1)
-    pfOrientation = np.array([pfZ,pfW]).reshape(2, -1)
-    return times, truePosition, trueOrientation, pfPosition, pfOrientation
+    return times, truePosition, trueOrientation.reshape(3,-1),trueAngle, pfPosition, pfOrientation.reshape(3,-1), pfAngle
 
 
 def getError(arr1, arr2):
@@ -142,10 +146,12 @@ def getError(arr1, arr2):
 
 
 def getAngleDiff(arr1,arr2):
-    magnitude1 = np.sqrt(arr1[0]**2 + arr1[1]**2).reshape(1,-1)
-    magnitude2 = np.sqrt(arr2[0]**2 + arr2[1]**2).reshape(1,-1)
-    dot = np.array([arr1[0]*arr2[0] + arr1[1]*arr2[1]]).reshape(1,-1)
-    angle = np.arccos(dot/(magnitude1*magnitude2))
+    v1 =np.array([np.cos(arr1), np.sin(arr1)]).reshape(2,-1)
+    v2 =np.array([np.cos(arr2), np.sin(arr2)]).reshape(2,-1)
+    mag1 = np.sqrt(v1[0]**2 + v1[1]**2).reshape(1,-1)
+    mag2 = np.sqrt(v2[0]**2 + v2[1]**2).reshape(1,-1)
+    dot = np.array([v1[0]*v2[0] + v1[1]*v2[1]]).reshape(1,-1)
+    angle = np.arccos(np.clip(dot/(mag1*mag2),-1,1))
     return angle
 
 def errorAnalysis(error):
@@ -158,23 +164,23 @@ def errorAnalysis(error):
     #quartiles
     upper_quartile = np.percentile(abs_error, 75)
     upper_quartile_index = np.where(abs_error == upper_quartile)
-    print(upper_quartile)
+    print("upper q",upper_quartile)
     # print(upper_quartile_index)
     lower_quartile = np.percentile(abs_error, 25)
     lower_quartile_index = np.where(abs_error == lower_quartile)
-    print(lower_quartile)
+    print("lower q", lower_quartile)
     # print(lower_quartile_index)
     median = np.percentile(abs_error, 50)
     median_index = np.where(abs_error == median)
-    print(median)
+    print("meadian" ,median)
     # print(median_index)
     max_error = np.max(abs_error)
     max_error_index = np.where(abs_error == max_error)
-    print(max_error)
+    print("max e", max_error)
     # print(max_error_index)
     min_error = np.min(abs_error)
     min_error_index = np.where(abs_error == min_error)
-    print(min_error)
+    print("min e", min_error)
     # print(min_error_index)
     #outliers
     iqr = upper_quartile - lower_quartile
@@ -191,7 +197,7 @@ def errorAnalysis(error):
 def main():
 
     file_path = '/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/gbr_1.csv'
-    time, truePosition, trueOrientation, pfPosition, pfOrientation = read_csv_file(file_path)
+    time, truePosition, trueOrientation, trueAngle, pfPosition, pfOrientation, pfAngle = read_csv_file(file_path)
 
     position_rmse = errorAnalysis(getError(truePosition, pfPosition))
     print("Position RMSE:", position_rmse)
@@ -202,19 +208,27 @@ def main():
     # print("Angle Diff:", ang)
     ang_rmse = errorAnalysis(ang)
     print("Angle RMSE:", ang_rmse)
+    # for a in range(ang.size):
+    #     if ang[0][a] != 0.0 and ang[0][a] != 2.0:
+    #         print(str(a), ang[0][a])
+    #     # print(str(a), ang[0][a])
 
     map_name = "gbr"
 
-    map_data = MapData(map_name)
-    map_data.plot_map_img()
-    ox, oy = map_data.xy2rc(truePosition[0], truePosition[1])
-    pf, py = map_data.xy2rc(pfPosition[0], pfPosition[1])
-    plt.plot(ox, oy, label='True Position', color='blue', linewidth=1.5)
-    plt.plot(pf, py, label='PF Position', color='red', linestyle='dashed', linewidth=0.9)
-    plt.legend()
-    plt.savefig('/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/0_gbr.png')
+    # map_data = MapData(map_name)
+    # map_data.plot_map_img()
+    # ox, oy = map_data.xy2rc(truePosition[0], truePosition[1])
+    # pf, py = map_data.xy2rc(pfPosition[0], pfPosition[1])
+    # plt.plot(ox, oy, label='True Position', color='blue', linewidth=1.5)
+    # plt.plot(pf, py, label='PF Position', color='red', linestyle='dashed', linewidth=0.9)
+    # plt.legend()
+    # plt.savefig('/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/0_gbr.svg')
 
 
+    # plt.show()
+
+    diffx = truePosition[1] - pfPosition[1]
+    plt.plot(time, diffx, label='True Position', color='blue', linewidth=1.5)
     plt.show()
 
 if __name__ == '__main__':
