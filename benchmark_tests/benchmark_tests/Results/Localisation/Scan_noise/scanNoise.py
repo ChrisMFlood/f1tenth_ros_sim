@@ -32,27 +32,49 @@ for i in range(5):
             testArray[angle,i] = max(0,min(2.5,abs(wallDistancesTests[i,0]/np.cos(angles[angle]))))
 
 error = np.zeros((int(scanParams[3]),5,5))
-
 for i in range(5):
     for j in range(len(angles)):
         for k in range(5):
-            error[j,i,k] = ((testArray[j,i] - scans[j,i,k])**2)
+            error[j,i,k] = ((testArray[j,i] - scans[j,i,k]))
+# print(error)
 
-print(error)
-
+rmse = np.zeros((5))
+sigma = np.zeros((5))
+print("RMSE")
 for i in range(5):
-    print(i,np.sqrt(sum(error[50:1000,i])/len(error[50:1000])))
+    rmse[i] = np.sqrt(np.sum(error[50:1000,i,1]**2)/len(error[50:1000,i,1]))
+    print(i,rmse[i])
 
 def standardDeviation(array):
     return np.sqrt(np.sum(array**2)/len(array))
 
+print("standard deviation")
 for i in range(5):
-    print(i,standardDeviation(error[50:1000,i]))
+    sigma[i] = standardDeviation(error[50:1000,i])
+    print(i,sigma[i])
+# print(error[50:1000,:].shape)
+
+# aE = np.zeros((4750,5))
+# for i in range(5):
+#     aE[:,i] = error[50:1000,:,i].reshape(-1)
+#     # print(aE[:,i])
+# # aE = error[50:1000,:].reshape(-1,5)
+# # print(aE.shape)
+# print("standard deviation")
+# for i in range(5):
+#     print(i,standardDeviation(aE[:,i]))
+
 
 # plt.figure()
 for i in range(5):
     plt.figure(i)
-    plt.hist(error[50:1000,i,0],bins=100, label=f"Test {i}")
+    for j in range(5):
+        # plt.plot(error[50:1000,i,j], label=f"Test {j}")
+        plt.hist(error[50:1000,i,j], bins=100, label=f"Test {j}")
+        
+    # plt.hist(error[50:1000,i,0],bins=100, label=f"Test {i}")
+    # plt.hist(error[:,i,0],bins=1000, label=f"Test {i}")
+    # plt.hist(aE[:,i],bins=1000, label=f"Test {i}")
 
 
 colors = ['r','g','b','y','m']
