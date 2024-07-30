@@ -34,11 +34,11 @@ for i in range(len(time)):
 
 angleDiff = getAngleDiff(realYawAngle,pfYawAngle)
 
-# plt.plot(range(len(time)), res[:,2]-res[:,6], label='True Position')
-# plt.plot(range(len(time)), res[:,3]-res[:,7], label='True Orientation')
+plt.plot(range(len(time)), res[:,2]-res[:,6], label='True Position X')
+plt.show()
+plt.plot(range(len(time)), res[:,3]-res[:,7], label='True Position Y')
+plt.show()
 plt.plot(range(len(time)), angleDiff[0], label='True Angle')
-# plt.plot(range(len(time)), realYawAngle-pfYawAngle, label='True Angle')
-
 plt.show()
 
 
