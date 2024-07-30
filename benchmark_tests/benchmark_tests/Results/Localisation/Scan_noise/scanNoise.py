@@ -35,7 +35,7 @@ error = np.zeros((int(scanParams[3]),5,5))
 for i in range(5):
     for j in range(len(angles)):
         for k in range(5):
-            error[j,i,k] = ((testArray[j,i] - scans[j,i,k]))
+            error[j,i,k] = (-(testArray[j,i] - scans[j,i,k]))
 # print(error)
 
 rmse = np.zeros((5))

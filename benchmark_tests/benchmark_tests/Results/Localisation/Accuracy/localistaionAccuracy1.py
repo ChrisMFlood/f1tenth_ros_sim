@@ -19,7 +19,9 @@ def getAngleDiff(arr1,arr2):
     angle = np.arccos(dot/(mag1*mag2))
     return angle
 
-res = np.loadtxt('benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/gbr_1.csv', delimiter=',')
+# res = np.loadtxt('benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/gbr_1.csv', delimiter=',')
+res = np.loadtxt('benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/cornerHall_1.csv', delimiter=',')
+
 
 time = res[:,0]+res[:,1]
 
