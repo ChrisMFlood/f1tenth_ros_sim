@@ -69,7 +69,7 @@ class localisation_test_accuracy(Node):
 
 		self.ds.saveData = np.vstack((self.ds.saveData, self.ds.tempData))
 		if self.ds.saveFlag:
-			self.ds.saveToFile(self.ds.saveData, 'gbr')
+			self.ds.saveToFile(self.ds.saveData, 'cornerHall')
 			self.get_logger().info('saving to file')
 			# self.ds.saveFlag = False
 			rclpy.shutdown()
