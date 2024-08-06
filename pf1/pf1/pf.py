@@ -6,25 +6,18 @@ from rclpy.node import Node
 import numpy as np
 import range_libc
 import time
-from threading import Lock
-from particle_filter import utils as Utils
 
 # TF
 # import tf.transformations
 # import tf
-from tf2_ros import TransformBroadcaster
 import tf_transformations
 
 # messages
-from std_msgs.msg import String, Header, Float32MultiArray
 from sensor_msgs.msg import LaserScan
-from visualization_msgs.msg import Marker
-from geometry_msgs.msg import Point, Pose, PoseStamped, PoseArray, Quaternion, PolygonStamped, Polygon, Point32, PoseWithCovarianceStamped, PointStamped, TransformStamped
+from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Quaternion
 from nav_msgs.msg import Odometry
 from nav_msgs.srv import GetMap
-from geometry_msgs.msg import Quaternion
 
-import matplotlib.pyplot as plt
 
 '''
 These flags indicate several variants of the sensor model. Only one of them is used at a time.
