@@ -18,6 +18,8 @@ from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Quaternion
 from nav_msgs.msg import Odometry
 from nav_msgs.srv import GetMap
 
+# TODO: Make a launch and params file
+
 
 '''
 These flags indicate several variants of the sensor model. Only one of them is used at a time.
@@ -43,7 +45,7 @@ class myNode(Node):
 		# self.WHICH_RM = 'cddt'
 		self.SHOW_FINE_TIMING = True
 		self.ranges = None
-		self.ANGLE_STEP = 10
+		self.ANGLE_STEP = 18
 		self.THETA_DISCRETIZATION = 112
 
 		## Lidar
@@ -64,7 +66,7 @@ class myNode(Node):
 		self.MOTION_DISPERSION_THETA = 0.25
 
 		##PF
-		self.MAX_PARTICLES = 4000
+		self.MAX_PARTICLES = 5000
 		
 
 		
@@ -182,7 +184,6 @@ class myNode(Node):
 				z = float(r-d)
 				# Normal distribution
 				prob += z_hit * np.exp(-(z*z)/(2.0*sigma_hit*sigma_hit)) / (sigma_hit * np.sqrt(2.0*np.pi))
-				# prob =1.0
 				# observed range is less than the predicted range - short reading
 				if r < d:
 					prob += 2.0 * z_short * (d - r) / float(d)
@@ -291,9 +292,7 @@ class myNode(Node):
 		# print(self.weights)
 		proposal_distribution = self.resample()
 		self.motion_model(proposal_distribution, deltas)
-		weights = np.copy(self.weights)
-		self.sensor_model(proposal_distribution, observation, weights)
-		self.weights = weights
+		self.sensor_model(proposal_distribution, observation, self.weights)
 		self.weights /= np.sum(self.weights)
 		self.expected_pose = self.expectedPose()
 		self.get_logger().info('Expected Pose: ' + str(self.expected_pose))
@@ -333,8 +332,6 @@ class myNode(Node):
 
 		There are 4 different variants using various features of RangeLibc for demonstration purposes.
 		- VAR_REPEAT_ANGLES_EVAL_SENSOR is the most stable, and is very fast.
-		- VAR_NO_EVAL_SENSOR_MODEL directly indexes the precomputed sensor model. This is slow
-								   but it demonstrates what self.range_method.eval_sensor_model does
 		- VAR_RADIAL_CDDT_OPTIMIZATIONS is only compatible with CDDT or PCDDT, it implments the radial
 										optimizations to CDDT which simultaneously performs ray casting
 										in two directions, reducing the amount of work by roughly a third
@@ -372,9 +369,9 @@ class myNode(Node):
 		fake_ranges = np.zeros((num_rays), dtype=np.float32)
 		self.range_method.calc_range_repeat_angles(q, self.downsampled_angles,fake_ranges)
 		scan.ranges = fake_ranges.tolist()
-		scan.range_min = 0.0
-		scan.range_max = self.MAX_RANGE_METERS
-		scan.angle_increment = float(self.downsampled_angles[1] - self.downsampled_angles[0])	
+		# scan.range_min = 0.0
+		# scan.range_max = self.MAX_RANGE_METERS
+		# scan.angle_increment = float(self.downsampled_angles[1] - self.downsampled_angles[0])	
 		self.fake_scan_pub.publish(scan)
 		
 		
