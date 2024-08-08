@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             "start_position = f110_car_control.start_position:main",
+            "orientation = f110_car_control.orientation:main",
         ],
     },
 )

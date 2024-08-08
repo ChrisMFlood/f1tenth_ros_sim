@@ -6,6 +6,7 @@ from rclpy.node import Node
 import numpy as np
 import range_libc
 import time
+from threading import Lock
 
 # TF
 # import tf.transformations
@@ -14,7 +15,7 @@ import tf_transformations
 
 # messages
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Quaternion
+from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Quaternion, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from nav_msgs.srv import GetMap
 
@@ -42,7 +43,6 @@ class myNode(Node):
 		# self.WHICH_RM = 'rm'
 		# self.WHICH_RM = 'rmgpu'
 		self.WHICH_RM = 'glt'
-		# self.WHICH_RM = 'cddt'
 		self.SHOW_FINE_TIMING = True
 		self.ranges = None
 		self.ANGLE_STEP = 18
@@ -50,6 +50,8 @@ class myNode(Node):
 
 		## Lidar
 		self.MAX_RANGE_METERS = 30.0
+		##PF
+		self.MAX_PARTICLES = 4000
 
 		## Sensor Model
 		self.Z_SHORT = 0.01
@@ -61,22 +63,28 @@ class myNode(Node):
 		## Sensor model variant??
 		self.RANGELIB_VAR = 2
 		## Motion model
-		self.MOTION_DISPERSION_X = 0.05
+		self.MOTION_DISPERSION_X = 0.025
 		self.MOTION_DISPERSION_Y = 0.025
-		self.MOTION_DISPERSION_THETA = 0.25
+		self.MOTION_DISPERSION_THETA = 0.025
 
-		##PF
-		self.MAX_PARTICLES = 5000
+		self.sigmas = np.zeros(3)
+		self.deltas_hat = np.zeros((self.MAX_PARTICLES,3))
+		self.alpha1 = 0.5
+		self.alpha2 = 0.5
+		self.alpha3 = 1
+		self.alpha4 = 0.1
+
 		
 
 		
 		# Publishers
 		self.particle_pub = self.create_publisher(PoseArray, 'particles', 10)
-		self.expected_pose_pub = self.create_publisher(PoseStamped, 'expected_pose', 10)
+		self.expected_pose_pub = self.create_publisher(Odometry, 'expected_pose', 10)
 		self.fake_scan_pub = self.create_publisher(LaserScan, 'fake_scan', 10)
 		# Subscribers
 		self.scan_sub = self.create_subscription(LaserScan, 'scan', self.scan_callback, 10)
 		self.odom_sub = self.create_subscription(Odometry, '/ego_racecar/odom', self.odom_callback, 10)
+		self.click_pose_sub = self.create_subscription(PoseWithCovarianceStamped, '/initialpose', self.click_pose_callback, 10)
 		# Services
 		## Servers
 		## Clients
@@ -86,6 +94,8 @@ class myNode(Node):
 		# Variables
 		self.weights = np.ones(self.MAX_PARTICLES)/float(self.MAX_PARTICLES)
 		self.particle_indices = np.arange(self.MAX_PARTICLES)
+		self.particles = np.zeros((self.MAX_PARTICLES, 3))
+		# self.state_lock = Lock()
 		## Map
 		self.map_initialized = False
 		## Lidar
@@ -93,6 +103,7 @@ class myNode(Node):
 		self.angles = None
 		## Odometry
 		self.odom_initialized = False
+		# self.deltas = np.zeros(3)
 		# self.last_pose = None
 
 
@@ -100,7 +111,6 @@ class myNode(Node):
 		self.get_omap()
 		self.precompute_sensor_model()
 		self.initialize_global()
-		# self.visualiseParticles()
 		
 
 	def get_omap(self):
@@ -252,6 +262,7 @@ class myNode(Node):
 		'''
 		orientation = quaternion_to_angle(msg.pose.pose.orientation)
 		self.current_pose = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, orientation])
+		self.velocity = np.array([msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.angular.z])
 
 		if not self.odom_initialized:
 			self.get_logger().info('First odom received')
@@ -266,6 +277,7 @@ class myNode(Node):
 			self.first_sensor_update = True
 			self.update()
 
+
 	def update(self):
 		'''
 		Apply the MCL function to update particle filter state. 
@@ -276,8 +288,8 @@ class myNode(Node):
 			observation = np.copy(self.downsampled_ranges)
 			deltas = np.copy(self.deltas)
 			self.MCL(observation, deltas)
-			# self.visualiseParticles()
 			self.publishExpectedPose()
+			self.visualiseParticles()
 			# self.publishFakeScan()
 
 	def MCL(self, observation, deltas):
@@ -317,12 +329,23 @@ class myNode(Node):
 		function call overhead
 		
 		TODO this could be better, but it works for now
-			- fixed random noise is not very realistic
-			- ackermann model provides bad estimates at high speed
+			- model provides bad estimates at high speed
 		'''
-		particles[:,0] += deltas[1]*np.cos(particles[:,2]+deltas[0]) + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_X,size=self.MAX_PARTICLES)
-		particles[:,1] += deltas[1]*np.sin(particles[:,2]+deltas[0]) + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_Y,size=self.MAX_PARTICLES)
-		particles[:,2] += deltas[0] + deltas[2] + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_THETA,size=self.MAX_PARTICLES)
+		# particles[:,0] += deltas[1]*np.cos(particles[:,2]+deltas[0]) + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_X,size=self.MAX_PARTICLES)
+		# particles[:,1] += deltas[1]*np.sin(particles[:,2]+deltas[0]) + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_Y,size=self.MAX_PARTICLES)
+		# particles[:,2] += deltas[0] + deltas[2] + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_THETA,size=self.MAX_PARTICLES)
+
+		self.sigmas[0] = self.alpha1*deltas[0] + self.alpha2*deltas[1]
+		self.sigmas[1] = self.alpha3*deltas[1] + self.alpha4*(deltas[0]+deltas[2])
+		self.sigmas[2] = self.alpha1*deltas[2] + self.alpha2*deltas[1]
+
+		self.deltas_hat[:,0] = deltas[0] + np.random.normal(loc=0.0,scale=self.sigmas[0]**2,size=self.MAX_PARTICLES)
+		self.deltas_hat[:,1] = deltas[1] + np.random.normal(loc=0.0,scale=self.sigmas[1]**2,size=self.MAX_PARTICLES)
+		self.deltas_hat[:,2] = deltas[2] + np.random.normal(loc=0.0,scale=self.sigmas[2]**2,size=self.MAX_PARTICLES)
+
+		particles[:,0] += self.deltas_hat[:,1]*np.cos(particles[:,2]+self.deltas_hat[:,0]) #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_X,size=self.MAX_PARTICLES)
+		particles[:,1] += self.deltas_hat[:,1]*np.sin(particles[:,2]+self.deltas_hat[:,0]) #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_Y,size=self.MAX_PARTICLES)
+		particles[:,2] += self.deltas_hat[:,0] + self.deltas_hat[:,2] #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_THETA,size=self.MAX_PARTICLES)
 
 	def sensor_model(self, particles, obs, weights):
 		'''
@@ -347,13 +370,16 @@ class myNode(Node):
 		return np.dot(self.particles.transpose(), self.weights)
 	
 	def publishExpectedPose(self):
-		pose = PoseStamped()
-		pose.header.stamp = self.get_clock().now().to_msg()
-		pose.header.frame_id = 'map'
-		pose.pose.position.x = self.expected_pose[0]
-		pose.pose.position.y = self.expected_pose[1]
-		pose.pose.orientation = angle_to_quaternion(self.expected_pose[2])
-		self.expected_pose_pub.publish(pose)
+		Pose = Odometry()
+		Pose.header.stamp = self.get_clock().now().to_msg()
+		Pose.header.frame_id = 'map'
+		Pose.pose.pose.position.x = self.expected_pose[0]
+		Pose.pose.pose.position.y = self.expected_pose[1]
+		Pose.pose.pose.orientation = angle_to_quaternion(self.expected_pose[2])
+		Pose.twist.twist.linear.x = self.velocity[0]
+		Pose.twist.twist.linear.y = self.velocity[1]
+		Pose.twist.twist.angular.z = self.velocity[2]
+		self.expected_pose_pub.publish(Pose)
 
 	def publishFakeScan(self):
 		'''
@@ -369,10 +395,18 @@ class myNode(Node):
 		fake_ranges = np.zeros((num_rays), dtype=np.float32)
 		self.range_method.calc_range_repeat_angles(q, self.downsampled_angles,fake_ranges)
 		scan.ranges = fake_ranges.tolist()
-		# scan.range_min = 0.0
-		# scan.range_max = self.MAX_RANGE_METERS
-		# scan.angle_increment = float(self.downsampled_angles[1] - self.downsampled_angles[0])	
+		scan.range_min = 0.0
+		scan.range_max = self.MAX_RANGE_METERS
+		scan.angle_increment = float(self.downsampled_angles[1] - self.downsampled_angles[0])	
 		self.fake_scan_pub.publish(scan)
+
+	def click_pose_callback(self, msg: PoseWithCovarianceStamped):
+		self.get_logger().info('SETTING POSE')
+		self.get_logger().info(str(msg.pose.pose.position.x) + ' ' + str(msg.pose.pose.position.y) + ' ' + str(quaternion_to_angle(msg.pose.pose.orientation)))
+		self.weights = np.ones(self.MAX_PARTICLES) / float(self.MAX_PARTICLES)
+		self.particles[:,0] = msg.pose.pose.position.x + np.random.normal(loc=0.0,scale=0.5,size=self.MAX_PARTICLES)
+		self.particles[:,1] = msg.pose.pose.position.y + np.random.normal(loc=0.0,scale=0.5,size=self.MAX_PARTICLES)
+		self.particles[:,2] = quaternion_to_angle(msg.pose.pose.orientation) + np.random.normal(loc=0.0,scale=0.25,size=self.MAX_PARTICLES)
 		
 		
 
