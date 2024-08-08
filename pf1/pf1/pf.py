@@ -69,8 +69,12 @@ class myNode(Node):
 
 		self.sigmas = np.zeros(3)
 		self.deltas_hat = np.zeros((self.MAX_PARTICLES,3))
+		# self.alpha1 = 0.5
+		# self.alpha2 = 0.5
+		# self.alpha3 = 1
+		# self.alpha4 = 0.1
 		self.alpha1 = 0.5
-		self.alpha2 = 0.5
+		self.alpha2 = 0.015
 		self.alpha3 = 1
 		self.alpha4 = 0.1
 
@@ -335,9 +339,9 @@ class myNode(Node):
 		# particles[:,1] += deltas[1]*np.sin(particles[:,2]+deltas[0]) + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_Y,size=self.MAX_PARTICLES)
 		# particles[:,2] += deltas[0] + deltas[2] + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_THETA,size=self.MAX_PARTICLES)
 
-		self.sigmas[0] = self.alpha1*deltas[0] + self.alpha2*deltas[1]
+		self.sigmas[0] = self.alpha1*deltas[0] + self.alpha2/np.max([deltas[1],0.1])
 		self.sigmas[1] = self.alpha3*deltas[1] + self.alpha4*(deltas[0]+deltas[2])
-		self.sigmas[2] = self.alpha1*deltas[2] + self.alpha2*deltas[1]
+		self.sigmas[2] = self.alpha1*deltas[2] + self.alpha2/np.max([deltas[1],0.1])
 
 		self.deltas_hat[:,0] = deltas[0] + np.random.normal(loc=0.0,scale=self.sigmas[0]**2,size=self.MAX_PARTICLES)
 		self.deltas_hat[:,1] = deltas[1] + np.random.normal(loc=0.0,scale=self.sigmas[1]**2,size=self.MAX_PARTICLES)
