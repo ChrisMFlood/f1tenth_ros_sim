@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             "pf_node = pf1.pf:main",
+            'syn_pf = pf1.synpf:main',
         ],
     },
 )
