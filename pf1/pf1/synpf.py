@@ -5,7 +5,9 @@ import rclpy
 from rclpy.node import Node
 
 import numpy as np
+import rclpy.time
 import tf_transformations
+import tf2_ros
 # import utils.utils as Utils
 import range_libc
 from threading import Lock
@@ -97,7 +99,7 @@ class myNode(Node):
 		# self.alpha4 = 0.1
 
 		### TUM/ETH
-		self.alpha1 = 0.5
+		self.alpha1 = 0.25
 		self.alpha2 = 0.015
 		self.alpha3 = 1
 		self.alpha4 = 0.1
@@ -133,6 +135,11 @@ class myNode(Node):
 		self.click_pose_sub = self.create_subscription(PoseWithCovarianceStamped, '/initialpose', self.click_pose_callback, 10)
 		# Clients
 		self.map_client = self.create_client(GetMap, '/map_server/map')
+
+		# now = rclpy.time.Time()
+		# self.tf_buffer = tf2_ros.Buffer()
+		# trans= self.tf_buffer.lookup_transform("ego_racecar/base_link", "ego_racecar/laser", now)
+		self.laser_base_link_offset = np.array([-0.275,0.0,0.0])
 
 		# Initialize
 		self.get_omap()
@@ -378,13 +385,13 @@ class myNode(Node):
 		self.sigmas[1] = self.alpha3*deltas[1] + self.alpha4*(deltas[0]+deltas[2])
 		self.sigmas[2] = self.alpha1*deltas[2] + self.alpha2/np.max([deltas[1],0.1])
 
-		self.deltas_hat[:,0] = deltas[0] + np.random.normal(loc=0.0,scale=self.sigmas[0]**2,size=self.MAX_PARTICLES)
-		self.deltas_hat[:,1] = deltas[1] + np.random.normal(loc=0.0,scale=self.sigmas[1]**2,size=self.MAX_PARTICLES)
-		self.deltas_hat[:,2] = deltas[2] + np.random.normal(loc=0.0,scale=self.sigmas[2]**2,size=self.MAX_PARTICLES)
+		# self.deltas_hat[:,0] = deltas[0] + np.random.normal(loc=0.0,scale=self.sigmas[0]**2,size=self.MAX_PARTICLES)
+		# self.deltas_hat[:,1] = deltas[1] + np.random.normal(loc=0.0,scale=self.sigmas[1]**2,size=self.MAX_PARTICLES)
+		# self.deltas_hat[:,2] = deltas[2] + np.random.normal(loc=0.0,scale=self.sigmas[2]**2,size=self.MAX_PARTICLES)
 
-		# self.deltas_hat[:,0] = deltas[0] + np.random.normal(loc=0.0,scale=self.sigmas[0],size=self.MAX_PARTICLES)
-		# self.deltas_hat[:,1] = deltas[1] + np.random.normal(loc=0.0,scale=self.sigmas[1],size=self.MAX_PARTICLES)
-		# self.deltas_hat[:,2] = deltas[2] + np.random.normal(loc=0.0,scale=self.sigmas[2],size=self.MAX_PARTICLES)
+		self.deltas_hat[:,0] = deltas[0] + np.random.normal(loc=0.0,scale=np.abs(self.sigmas[0]),size=self.MAX_PARTICLES)
+		self.deltas_hat[:,1] = deltas[1] + np.random.normal(loc=0.0,scale=np.abs(self.sigmas[1]),size=self.MAX_PARTICLES)
+		self.deltas_hat[:,2] = deltas[2] + np.random.normal(loc=0.0,scale=np.abs(self.sigmas[2]),size=self.MAX_PARTICLES)
 
 		particles[:,0] += self.deltas_hat[:,1]*np.cos(particles[:,2]+self.deltas_hat[:,0]) #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_X,size=self.MAX_PARTICLES)
 		particles[:,1] += self.deltas_hat[:,1]*np.sin(particles[:,2]+self.deltas_hat[:,0]) #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_Y,size=self.MAX_PARTICLES)
@@ -399,8 +406,19 @@ class myNode(Node):
 			self.get_logger().info('First sensor update')
 			self.num_rays = self.downsampled_angles.shape[0]
 			self.ranges = np.zeros(self.num_rays*self.MAX_PARTICLES, dtype=np.float32)
+			self.queries = np.zeros(self.num_rays*self.MAX_PARTICLES, dtype=np.float32)
 
-		self.range_method.calc_range_repeat_angles(particles, self.downsampled_angles, self.ranges)
+		proposal_s = np.sin(particles[:,2])
+		proposal_c = np.cos(particles[:,2])
+		rot = np.array([[proposal_c, -proposal_s],
+						[proposal_s, proposal_c]]).transpose(2,0,1)   # (N,2,2)
+		laser_offset_2d = self.laser_base_link_offset[:2]
+		res = ( rot @ laser_offset_2d[np.newaxis, :, np.newaxis] ).reshape(self.MAX_PARTICLES, 2)
+
+		self.queries = np.copy(particles)
+		self.queries[:, :2] += res
+
+		self.range_method.calc_range_repeat_angles(self.queries, self.downsampled_angles, self.ranges)
 		self.range_method.eval_sensor_model(observation, self.ranges, weights, self.num_rays, self.MAX_PARTICLES)
 		# weights = np.power(weights, self.INV_SQUASH_FACTOR)
 		self.get_logger().info('Weights: '+str(np.max(weights)) +','+ str(np.min(weights)))

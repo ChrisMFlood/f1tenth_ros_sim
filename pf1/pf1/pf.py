@@ -69,14 +69,14 @@ class myNode(Node):
 
 		self.sigmas = np.zeros(3)
 		self.deltas_hat = np.zeros((self.MAX_PARTICLES,3))
-		# self.alpha1 = 0.5
-		# self.alpha2 = 0.5
-		# self.alpha3 = 1
-		# self.alpha4 = 0.1
 		self.alpha1 = 0.5
-		self.alpha2 = 0.015
+		self.alpha2 = 0.5
 		self.alpha3 = 1
 		self.alpha4 = 0.1
+		# self.alpha1 = 0.5
+		# self.alpha2 = 0.015
+		# self.alpha3 = 1
+		# self.alpha4 = 0.1
 
 		
 
@@ -99,7 +99,7 @@ class myNode(Node):
 		self.weights = np.ones(self.MAX_PARTICLES)/float(self.MAX_PARTICLES)
 		self.particle_indices = np.arange(self.MAX_PARTICLES)
 		self.particles = np.zeros((self.MAX_PARTICLES, 3))
-		# self.state_lock = Lock()
+		self.state_lock = Lock()
 		## Map
 		self.map_initialized = False
 		## Lidar
@@ -219,9 +219,9 @@ class myNode(Node):
 		'''
 		Spread the particle distribution over the permissible region of the state space.
 		'''
+		self.state_lock.acquire()
 		self.get_logger().info('GLOBAL INITIALIZATION')
 		# randomize over grid coordinate space
-		# self.state_lock.acquire()
 		permissible_x, permissible_y = np.where(self.permissible_region == 1)
 		indices = np.random.randint(0, len(permissible_x), size=self.MAX_PARTICLES)
 
@@ -234,7 +234,7 @@ class myNode(Node):
 		map_to_world(permissible_states, self.map_info)
 		self.particles = permissible_states
 		self.weights[:] = 1.0 / self.MAX_PARTICLES
-		# self.state_lock.release()
+		self.state_lock.release()
 
 	def scan_callback(self, msg: LaserScan):
 		'''
@@ -246,11 +246,11 @@ class myNode(Node):
 		self.downsampled_ranges = np.array(msg.ranges[::self.ANGLE_STEP])
 		# self.downsampled_ranges = np.copy(self.scan)
 		
-		self.angle_min = msg.angle_min
-		self.angle_max = msg.angle_max
 
 		if (not self.lidar_initialized):
 			self.get_logger().info('Scan received')
+			self.angle_max = msg.angle_max
+			self.angle_min = msg.angle_min
 			self.angles = np.linspace(self.angle_min, self.angle_max, len(self.scan),dtype=np.float32)
 			# self.downsampled_angles = np.copy(self.angles)
 			self.downsampled_angles = np.copy(self.angles[0::self.ANGLE_STEP]).astype(np.float32)
@@ -273,9 +273,9 @@ class myNode(Node):
 			self.last_pose = self.current_pose
 			self.odom_initialized = True
 		else:
-			delta_rot1 = np.arctan2(msg.pose.pose.position.y - self.last_pose[1], msg.pose.pose.position.x - self.last_pose[0]) - self.last_pose[2]
+			delta_rot1 = (np.arctan2(msg.pose.pose.position.y - self.last_pose[1], msg.pose.pose.position.x - self.last_pose[0]) - self.last_pose[2])
 			delta_trans = np.sqrt((msg.pose.pose.position.x - self.last_pose[0])**2 + (msg.pose.pose.position.y - self.last_pose[1])**2)
-			delta_rot2 = orientation - self.last_pose[2] - delta_rot1
+			delta_rot2 = (orientation - self.last_pose[2] - delta_rot1)
 			self.deltas = np.array([delta_rot1, delta_trans, delta_rot2])
 			self.last_pose = self.current_pose
 			self.first_sensor_update = True
@@ -288,12 +288,16 @@ class myNode(Node):
 
 		Ensures the state is correctly initialized, and acquires the state lock before proceeding.
 		'''
+		if self.state_lock.locked():
+			return
 		if self.lidar_initialized and self.odom_initialized and self.map_initialized:
+			self.state_lock.acquire()
 			observation = np.copy(self.downsampled_ranges)
 			deltas = np.copy(self.deltas)
 			self.MCL(observation, deltas)
+			self.state_lock.release()
 			self.publishExpectedPose()
-			self.visualiseParticles()
+			# self.visualiseParticles()
 			# self.publishFakeScan()
 
 	def MCL(self, observation, deltas):
@@ -311,7 +315,8 @@ class myNode(Node):
 		self.sensor_model(proposal_distribution, observation, self.weights)
 		self.weights /= np.sum(self.weights)
 		self.expected_pose = self.expectedPose()
-		self.get_logger().info('Expected Pose: ' + str(self.expected_pose))
+		# self.expected_pose[2] = normalize(self.expected_pose[2])
+		self.get_logger().info('Expected Pose: ' + str(self.expected_pose) + str(normalize(self.expected_pose[2])))
 		self.particles = proposal_distribution
 
 	def resample(self):
@@ -339,17 +344,24 @@ class myNode(Node):
 		# particles[:,1] += deltas[1]*np.sin(particles[:,2]+deltas[0]) + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_Y,size=self.MAX_PARTICLES)
 		# particles[:,2] += deltas[0] + deltas[2] + np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_THETA,size=self.MAX_PARTICLES)
 
-		self.sigmas[0] = self.alpha1*deltas[0] + self.alpha2/np.max([deltas[1],0.1])
-		self.sigmas[1] = self.alpha3*deltas[1] + self.alpha4*(deltas[0]+deltas[2])
-		self.sigmas[2] = self.alpha1*deltas[2] + self.alpha2/np.max([deltas[1],0.1])
+		# self.sigmas[0] = (self.alpha1*deltas[0]**2 + self.alpha2/np.max([deltas[1],0.05]))
+		# self.sigmas[1] = (self.alpha3*deltas[1]**2 + self.alpha4*(deltas[0]**2+deltas[2]**2))
+		# self.sigmas[2] = (self.alpha1*deltas[2]**2 + self.alpha2/np.max([deltas[1],0.05]))
 
-		self.deltas_hat[:,0] = deltas[0] + np.random.normal(loc=0.0,scale=self.sigmas[0]**2,size=self.MAX_PARTICLES)
-		self.deltas_hat[:,1] = deltas[1] + np.random.normal(loc=0.0,scale=self.sigmas[1]**2,size=self.MAX_PARTICLES)
-		self.deltas_hat[:,2] = deltas[2] + np.random.normal(loc=0.0,scale=self.sigmas[2]**2,size=self.MAX_PARTICLES)
+		sigmas =np.zeros(3)
+		deltas_hat = np.zeros((self.MAX_PARTICLES,3))
 
-		particles[:,0] += self.deltas_hat[:,1]*np.cos(particles[:,2]+self.deltas_hat[:,0]) #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_X,size=self.MAX_PARTICLES)
-		particles[:,1] += self.deltas_hat[:,1]*np.sin(particles[:,2]+self.deltas_hat[:,0]) #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_Y,size=self.MAX_PARTICLES)
-		particles[:,2] += self.deltas_hat[:,0] + self.deltas_hat[:,2] #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_THETA,size=self.MAX_PARTICLES)
+		sigmas[0] = (self.alpha1*deltas[0]**2 + self.alpha2*deltas[1]**2)
+		sigmas[1] = (self.alpha3*deltas[1]**2 + self.alpha4*(deltas[0]**2+deltas[2]**2))
+		sigmas[2] = (self.alpha1*deltas[2]**2 + self.alpha2*deltas[1]**2)
+
+		deltas_hat[:,0] = deltas[0] + np.random.normal(loc=0.0,scale=sigmas[0],size=self.MAX_PARTICLES)
+		deltas_hat[:,1] = deltas[1] + np.random.normal(loc=sigmas[1]/2,scale=sigmas[1],size=self.MAX_PARTICLES)
+		deltas_hat[:,2] = deltas[2] + np.random.normal(loc=0.0,scale=sigmas[2],size=self.MAX_PARTICLES)
+
+		particles[:,0] += deltas_hat[:,1]*np.cos(particles[:,2]+deltas_hat[:,0]) #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_X,size=self.MAX_PARTICLES)
+		particles[:,1] += deltas_hat[:,1]*np.sin(particles[:,2]+deltas_hat[:,0]) #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_Y,size=self.MAX_PARTICLES)
+		particles[:,2] += deltas_hat[:,0] + deltas_hat[:,2] #+ np.random.normal(loc=0.0,scale=self.MOTION_DISPERSION_THETA,size=self.MAX_PARTICLES)
 
 	def sensor_model(self, particles, obs, weights):
 		'''
@@ -364,9 +376,9 @@ class myNode(Node):
 										in two directions, reducing the amount of work by roughly a third
 		'''
 		num_rays = self.downsampled_angles.shape[0]
-		self.ranges = np.zeros(num_rays*self.MAX_PARTICLES, dtype=np.float32)
-		self.range_method.calc_range_repeat_angles(particles, self.downsampled_angles, self.ranges)
-		self.range_method.eval_sensor_model(obs, self.ranges, weights, num_rays, self.MAX_PARTICLES)
+		ranges = np.zeros(num_rays*self.MAX_PARTICLES, dtype=np.float32)
+		self.range_method.calc_range_repeat_angles(particles, self.downsampled_angles, ranges)
+		self.range_method.eval_sensor_model(obs, ranges, weights, num_rays, self.MAX_PARTICLES)
 		# weights = np.power(weights, self.INV_SQUASH_FACTOR)
 		self.get_logger().info('Weights: '+str(np.max(weights)) +','+ str(np.min(weights)))
 
@@ -602,6 +614,24 @@ def world_to_map(poses, map_info):
 	poses[:,1] = s*temp       + c*poses[:,1]
 	poses[:,2] += angle
 
+def normalize(z):
+    '''Normalizes an angle to between [-pi, pi]'''
+    if -np.pi <= z <= np.pi:
+        return z
+    return np.arctan2(np.sin(z), np.cos(z))
+
+def angle_diff(a, b):
+    '''Computes the shortest distance between two angles'''
+    a = normalize(a)
+    b = normalize(b)
+    d1 = a-b
+    d2 = 2*np.pi - np.abs(d1)
+    if(d1 > 0):
+        d2 *= -1.0
+    if(np.abs(d1) < np.abs(d2)):
+        return d1
+    else:
+        return d2
 
 		
 		
