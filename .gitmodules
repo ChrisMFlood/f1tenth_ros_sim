@@ -4,6 +4,4 @@
 [submodule "particle_filter"]
 	path = particle_filter
 	url = git@github.com:ChrisMFlood/particle_filter.git
-[submodule "global_planning/trajectory_planning_helpers"]
-	path = global_planning/trajectory_planning_helpers
-	url = https://github.com/TUMFTM/trajectory_planning_helpers.git
+
