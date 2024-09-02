@@ -6,6 +6,7 @@ import csv, yaml
 from PIL import Image
 from matplotlib.collections import LineCollection
 from transforms3d import euler
+import trajectory_planning_helpers
 
 class MapData:
     def __init__(self, map_name):
