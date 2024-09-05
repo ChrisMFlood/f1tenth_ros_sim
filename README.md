@@ -25,7 +25,8 @@ source ~/sim_ws/install/setup.bash
 echo "source ~/sim_ws/install/setup.bash" >> ~/.bashrc
 ```
 ## Pipeline 
-### F1tenth Particle Filter
+### Perception
+#### F1tenth Particle Filter
 ```bash
 cd $HOME/sim_ws/src
 git clone https://github.com/f1tenth/particle_filter.git
@@ -38,7 +39,7 @@ To use it in the simulator, you must comment out the launch of the map_server in
     ld.add_action(nav_lifecycle_node)
     ld.add_action(map_server_node)
 Then, in the config/localize.yaml file, change the 'odometry_topic' to '/ego_racecar/odom' and 'range_method' to 'glt
-#### Download Rangelibc library
+##### Download Rangelibc library
 ```bash
 cd $HOME
 # No need to clone this in your workspace, we will only use the python wrapper
@@ -48,7 +49,7 @@ cd range_libc/pywrapper
 ./compile.sh
 sudo TRACE=ON python3 setup.py install
 ```
-#### Fix to visualise "fake" scan
+##### Fix to visualise "fake" scan
 
 ```python
 def publish_scan(self, angles, ranges):
@@ -65,6 +66,9 @@ ls.ranges = [float(range) for range in ranges]
 self.pub_fake_scan.publish(ls)
 ```
 To be continued
+### Planning
+#### Global Planning
+To create Racelines and centerlines run genertatePaths.py
 
 # Launch
 ## Bridge
