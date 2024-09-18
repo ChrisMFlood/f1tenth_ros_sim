@@ -12,7 +12,7 @@ class CentreLine:
 		self.track = np.loadtxt(file_name, delimiter=',')
 		# get every second point of the track to reduce the number of points
 		# self.track = self.track[::10]
-		self.track, self.sampled_index = tph.nonreg_sampling.nonreg_sampling(self.track, 0.0000000000001, 40)
+		# self.track, self.sampled_index = tph.nonreg_sampling.nonreg_sampling(self.track, 0.0000000000001, 40)
 
 		self.path = self.track[:, :2]
 		self.widths = self.track[:, 2:4]

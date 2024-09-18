@@ -13,12 +13,10 @@ def load_parameter_file(paramFile):
 	return params
 
 class CentreLine:
-	def __init__(self, track_path, sample: bool = False):
-		self.track = np.loadtxt(track_path, delimiter=',', skiprows=1)[::3]
-		if sample:
-			self.track, self.sampled_index = tph.nonreg_sampling.nonreg_sampling(self.track, 1e-3, 1)
-		else:
-			self.track = self.track#[::3]
+	def __init__(self, track_path):
+		track = np.loadtxt(track_path, delimiter=',', skiprows=1)
+		self.track = tph.interp_track.interp_track(track, 0.2)
+
 
 		self.path = self.track[:, :2]
 		self.widths = self.track[:, 2:4]
@@ -27,14 +25,13 @@ class CentreLine:
 		self.psi, self.kappa = tph.calc_head_curv_num.calc_head_curv_num(self.path, self.el_lengths, False)
 		self.normvectors = tph.calc_normal_vectors.calc_normal_vectors(self.psi)
 
-def generateMinCurvaturePath(centreline_path, sample: bool = False, opt_number: int = 0):
+def generateMinCurvaturePath(centreline_path, opt_number: int = 0):
 	'''
 	centreline_path: str, path to the centreline file (f"maps/{map_name}_wl_centreline.csv")
 	'''
 	racetrack_params = load_parameter_file("RaceTrackGenerator")
 	map_name = centreline_path.split('/')[-1].split('_')[0]
-	centreline = CentreLine(centreline_path, sample)
-
+	centreline = CentreLine(centreline_path)
 	closed_path = np.row_stack([centreline.path, centreline.path[0]])
 	closed_lengths = np.append(centreline.el_lengths, centreline.el_lengths[0])
 
@@ -47,12 +44,10 @@ def generateMinCurvaturePath(centreline_path, sample: bool = False, opt_number: 
 	centreline.widths[:, 1] += alpha
 	new_widths = tph.interp_track_widths.interp_track_widths(centreline.widths, spline_inds_raceline_interp, t_values_raceline_interp)
 	min_curve_track = np.concatenate([path, new_widths], axis=1)
+	min_curve_track = tph.interp_track.interp_track(min_curve_track, 0.1)
+	# min_curve_track = tph.nonreg_sampling.nonreg_sampling(min_curve_track, 0.1,3)
 
-	if not sample:
-		save_path = f"maps/{map_name}_min_curve_{opt_number}.csv"
-	else:
-		save_path = f"maps/{map_name}_min_curve_unregular_sample_{opt_number}.csv"
-	# save_path = f"maps/{map_name}_min_curve_unregular_sample_{opt_number}.csv"
+	save_path = f"maps/{map_name}_min_curve_{opt_number}.csv"
 
 	with open(save_path, 'wb') as fh:
 		np.savetxt(fh, min_curve_track, fmt='%0.16f', delimiter=',', header='x_m,y_m,w_tr_right_m,w_tr_left_m')
@@ -60,26 +55,22 @@ def generateMinCurvaturePath(centreline_path, sample: bool = False, opt_number: 
 	# if opt_number == 0:
 	# 	generateMinCurvaturePath(centreline_path=save_path, sample=sample, opt_number=1)
 
+
+
 def main():
 	for file in os.listdir('maps/'):
 		if file.endswith('.png'):
 			map_name = file.split('.')[0]
-			if not os.path.exists(f"maps/{map_name}_wl_centreline.csv"):
-				print(f"Extracting centre line for: {map_name}")
-				getCentreLine(map_name)
+			# if not os.path.exists(f"maps/{map_name}_centreline.csv"):
+			# 	print(f"Extracting centre line for: {map_name}")
+			# 	getCentreLine(map_name)
 			# if not os.path.exists(f"maps/{map_name}_min_curve_0.csv"):
-			# 	print(f"Generating minimum curvature path for: {map_name}")
-			# 	generateMinCurvaturePath(f"maps/{map_name}_wl_centreline.csv", sample=False, opt_number=0)
-			# if not os.path.exists(f"maps/{map_name}_min_curve_unregular_sample_0.csv"):
-			# 	print(f"Generating minimum curvature path for: {map_name} with unregular sampling")
-			# 	generateMinCurvaturePath(f"maps/{map_name}_wl_centreline.csv", sample=True, opt_number=0)
-
-			print(f"Generating minimum curvature paths for: {map_name}")
-			# generateMinCurvaturePath(f"maps/{map_name}_wl_centreline_smooth.csv", sample=False, opt_number=0)
-			# generateMinCurvaturePath(f"maps/{map_name}_wl_centreline_smooth.csv", sample=True, opt_number=0)
-			# generateMinCurvaturePath(f"maps/{map_name}_min_curve_0.csv", sample=False, opt_number=1)
-			generateMinCurvaturePath(f"maps/{map_name}_min_curve_1.csv", sample=False, opt_number=2)
-			# generateMinCurvaturePath(f"maps/{map_name}_min_curve_unregular_sample_0.csv", sample=False, opt_number=1)
+			print(f"Extracting min curvature path for: {map_name}")
+			generateMinCurvaturePath(centreline_path=f"maps/{map_name}_centreline.csv", opt_number=0)
+			generateMinCurvaturePath(centreline_path=f"maps/{map_name}_min_curve_0.csv", opt_number=1)
+			generateMinCurvaturePath(centreline_path=f"maps/{map_name}_min_curve_1.csv", opt_number=2)
+			generateMinCurvaturePath(centreline_path=f"maps/{map_name}_min_curve_2.csv", opt_number=3)
+			generateMinCurvaturePath(centreline_path=f"maps/{map_name}_min_curve_3.csv", opt_number=4)
 
 
 
