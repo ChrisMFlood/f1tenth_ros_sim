@@ -13,7 +13,7 @@ class myNode(Node):
 		super().__init__("pure_pursuit")
 		# Parameters
 		self.declare_parameter("lookahead_distance", 1)
-		self.declare_parameter("k", 0.99)
+		self.declare_parameter("k", 0.5)
 		self.declare_parameter("wheel_base", 0.33)
 		self.declare_parameter("min_speed", 0.1)
 		self.declare_parameter("max_steering_angle", 0.4)
@@ -33,8 +33,8 @@ class myNode(Node):
 		self.marker_pub = self.create_publisher(Marker, "/waypoint_marker", 10)
 
 		# Waypoints
-		self.waypoints = np.loadtxt(f'src/global_planning/maps/{self.map_name}_short_minCurve.csv', delimiter=',', skiprows=1)
-		
+		# self.waypoints = np.loadtxt(f'src/global_planning/maps/{self.map_name}_short_minCurve.csv', delimiter=',', skiprows=1)
+		self.waypoints = np.loadtxt(f'src/global_planning/maps/{self.map_name}_centreline.csv', delimiter=',', skiprows=1)
 
 		# Variables  
 		self.odom: Odometry = None
@@ -57,11 +57,11 @@ class myNode(Node):
 		return closest_index
 	
 	def getLookAheadDistance(self):
-		# lookahead_distance = 0.5 + self.k/np.abs(self.waypoints[self.closest_index,5]) * 0.15
-		cross_error = np.linalg.norm(self.waypoints[self.closest_index, :2]-self.pose[:2])
-		kappa = np.average(self.waypoints[self.closest_index:self.closest_index+5,5])
-		lookahead_distance = np.sqrt(2*cross_error/np.abs(kappa))
-		lookahead_distance = np.clip(lookahead_distance, 0.5, 4)
+		lookahead_distance = 0.5 + self.k/np.abs(self.waypoints[self.closest_index,5]) * 0.15
+		# cross_error = np.linalg.norm(self.waypoints[self.closest_index, :2]-self.pose[:2])
+		# kappa = np.average(self.waypoints[self.closest_index:self.closest_index+5,5])
+		# lookahead_distance = np.sqrt(2*cross_error/np.abs(kappa))
+		lookahead_distance = np.clip(lookahead_distance, 0.5, 3)
 		return lookahead_distance
 
 	def get_closest_waypoint(self):
@@ -80,15 +80,16 @@ class myNode(Node):
 		radius = (LD**2) / (2 * waypoint)
 		steering_angle = np.arctan(self.wheel_base / radius)
 		steering_angle = np.clip(steering_angle, -self.max_steering_angle, self.max_steering_angle)
-		# speed = np.max([self.speed[self.closest_index][0],0.1])
-		speed = 4.0
+		speed = np.max([self.waypoints[self.closest_index,7],0.1])
+		
 		print(f"Speed: {speed}")
 		cmd = AckermannDriveStamped()
 		cmd.header.stamp = self.get_clock().now().to_msg()
 		cmd.header.frame_id = "map"
 		cmd.drive.steering_angle = steering_angle
+		self.get_logger().info(f'Steering angle: {steering_angle}')
 		cmd.drive.speed = speed
-		self.cmd_pub.publish(cmd)
+		# self.cmd_pub.publish(cmd)
 
 	def visualiseMarker(self):
 		marker = Marker()
