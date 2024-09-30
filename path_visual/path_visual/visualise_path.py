@@ -8,7 +8,7 @@ class PathVisualizer(Node):
 		super().__init__('path_visualizer')
 		self.publisher = self.create_publisher(MarkerArray, 'visualization_marker_array', 10)
 		self.centreLine = self.read_csv('/home/chris/sim_ws/src/global_planning/maps/esp_centreline.csv')
-		self.raceline = self.read_csv('/home/chris/sim_ws/src/global_planning/maps/esp_min_curve_short_iqp.csv')
+		self.raceline = self.read_csv('/home/chris/sim_ws/src/global_planning/maps/esp_short_minCurve.csv')
 
 		# self.publish_path(self.centreLine)
 		self.publish_path(self.raceline)

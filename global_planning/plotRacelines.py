@@ -10,9 +10,9 @@ for file in os.listdir('maps/'):
             map_yaml_path = f"maps/{map_name}.yaml"
             map_img = plt.imread(f'maps/{map_name}.png')
             centreline = np.loadtxt(f"maps/{map_name}_centreline.csv", delimiter=',')
-            iqpc = np.loadtxt(f"maps/{map_name}_min_curve_iqp.csv", delimiter=',')
-            short = np.loadtxt(f"maps/{map_name}_short.csv", delimiter=',')
-            iqps = np.loadtxt(f"maps/{map_name}_min_curve_short_iqp.csv", delimiter=',')
+            # iqpc = np.loadtxt(f"maps/{map_name}_min_curve_iqp.csv", delimiter=',')
+            # short = np.loadtxt(f"maps/{map_name}_short.csv", delimiter=',')
+            # iqps = np.loadtxt(f"maps/{map_name}_min_curve_short_iqp.csv", delimiter=',')
 
             # flip the image around x axis
             map_img = np.flipud(map_img)
@@ -39,26 +39,26 @@ for file in os.listdir('maps/'):
             x /= map_resolution
             y /= map_resolution
 
-            iqpcX = iqpc[:, 0]
-            iqpcY = iqpc[:, 1]
-            iqpcX -= orig_x
-            iqpcY -= orig_y
-            iqpcX /= map_resolution
-            iqpcY /= map_resolution
+            # iqpcX = iqpc[:, 0]
+            # iqpcY = iqpc[:, 1]
+            # iqpcX -= orig_x
+            # iqpcY -= orig_y
+            # iqpcX /= map_resolution
+            # iqpcY /= map_resolution
 
-            shortX = short[:, 0]
-            shortY = short[:, 1]
-            shortX -= orig_x
-            shortY -= orig_y
-            shortX /= map_resolution
-            shortY /= map_resolution
+            # shortX = short[:, 0]
+            # shortY = short[:, 1]
+            # shortX -= orig_x
+            # shortY -= orig_y
+            # shortX /= map_resolution
+            # shortY /= map_resolution
 
-            iqpsX = iqps[:, 0]
-            iqpsY = iqps[:, 1]
-            iqpsX -= orig_x
-            iqpsY -= orig_y
-            iqpsX /= map_resolution
-            iqpsY /= map_resolution
+            # iqpsX = iqps[:, 0]
+            # iqpsY = iqps[:, 1]
+            # iqpsX -= orig_x
+            # iqpsY -= orig_y
+            # iqpsX /= map_resolution
+            # iqpsY /= map_resolution
             
 
             plt.figure(figsize=(30,30))
@@ -68,9 +68,9 @@ for file in os.listdir('maps/'):
             plt.plot(startX, startY, 'ro', label='Start')
             plt.plot(x, y, '--', label='Centreline')
 
-            plt.plot(iqpcX, iqpcY, label='IQPC')
-            plt.plot(shortX, shortY, label='Shortest Path')
-            plt.plot(iqpsX, iqpsY, label='IQPS')
+            # plt.plot(iqpcX, iqpcY, label='IQPC')
+            # plt.plot(shortX, shortY, label='Shortest Path')
+            # plt.plot(iqpsX, iqpsY, label='IQPS')
             plt.legend(loc='upper right')
             # save the figure to Data folder
 

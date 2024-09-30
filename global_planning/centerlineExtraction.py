@@ -9,16 +9,46 @@ import os
 import pandas as pd
 import trajectory_planning_helpers as tph
 import sys
+from velocityProfile import generateVelocityProfile
 
 class CentreLine:
 	def __init__(self, track):
-		self.track = track[::2]
-		self.path = self.track[:, :2]
-		self.widths = self.track[:, 2:4]
+		self.path = track[:, :2]
+		self.widths = track[:, 2:4]
 		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)
-		self.s_path = np.insert(np.cumsum(self.el_lengths), 0, 0)
-		self.psi, self.kappa = tph.calc_head_curv_num.calc_head_curv_num(self.path, self.el_lengths, False)
-		self.normvectors = tph.calc_normal_vectors.calc_normal_vectors(self.psi)
+
+		self.closed_path = np.row_stack([self.path, self.path[0]])
+		self.closed_el_lengths = np.linalg.norm(np.diff(self.closed_path, axis=0), axis=1)
+		self.closed_widths = np.row_stack([self.widths, self.widths[0]])
+
+		coeffs_x, coeffs_y, A, normvec_normalized = tph.calc_splines.calc_splines(self.closed_path, self.closed_el_lengths)
+
+		alpha, error = tph.opt_min_curv.opt_min_curv(track, normvec_normalized, A, 1, 0, print_debug=True, closed=True)
+		path,_,_,_,spline_inds_raceline_interp, t_values_raceline_interp,s,s_length,_ = tph.create_raceline.create_raceline(self.path, normvec_normalized, alpha, 0.1)
+		widths = np.copy(self.widths)
+		widths[:, 0] -= alpha
+		widths[:, 1] += alpha
+		widths = tph.interp_track_widths.interp_track_widths(widths, spline_inds_raceline_interp, t_values_raceline_interp)
+
+		closed_path = np.row_stack([path, path[0]])
+		closed_widths = np.row_stack([widths, widths[0]])
+		closed_lengths =  np.linalg.norm(np.diff(closed_path, axis=0), axis=1)
+		coeffs_x, coeffs_y, A, normvec_normalized = tph.calc_splines.calc_splines(closed_path, closed_lengths)
+		path_interp, spline_inds, t_values, dists_interp = tph.interp_splines.interp_splines(coeffs_x, coeffs_y, closed_lengths, False, 0.1)
+		w_track_interp = tph.interp_track_widths.interp_track_widths(closed_widths, spline_inds, t_values)
+
+		path = path_interp
+		widths = w_track_interp
+
+		v,a,t=generateVelocityProfile(np.column_stack((path, widths)))
+
+
+		el_lengths = np.linalg.norm(np.diff(path, axis=0), axis=1)
+		self.s_path = np.insert(np.cumsum(el_lengths), 0, 0)
+		self.psi, self.kappa = tph.calc_head_curv_num.calc_head_curv_num(np.column_stack((path[:,1],path[:,0])), el_lengths, False)
+		self.data_save = np.column_stack((path, widths, -self.psi, self.kappa, self.s_path, v, a, t))
+		# print(self.path.shape)
+		# print(path.shape)
 
 # Constants
 TRACK_WIDTH_MARGIN = 0.0 # Extra Safety margin, in meters
@@ -26,6 +56,8 @@ TRACK_WIDTH_MARGIN = 0.0 # Extra Safety margin, in meters
 # Modified from https://github.com/CL2-UWaterloo/Head-to-Head-Autonomous-Racing/blob/main/gym/f110_gym/envs/laser_models.py
 # load map image
 def getCentreLine(map_name):
+	'''Extracts the centreline from the map image and saves it as a csv file'''
+	print(f"Extracting centre line for: {map_name}")
 	if os.path.exists(f"maps/{map_name}.png"):
 		map_img_path = f"maps/{map_name}.png"
 	elif os.path.exists(f"maps/{map_name}.pgm"):
@@ -91,10 +123,6 @@ def getCentreLine(map_name):
 	distanceToStart = np.where(centerline, distanceToStartTransform, distanceToStartTransform+200)
 	start_point = np.unravel_index(np.argmin(distanceToStart, axis=None), distanceToStart.shape)
 	print(start_point)
-	# plt.plot(startX, startY, 'go', markersize=10)
-	# plt.plot(starting_point[1], starting_point[0],'ro', markersize=10)
-	# plt.imshow(distanceToStart, cmap='gray')
-	# plt.show()
 	print(centerline[start_point])
 	starting_point = (start_point[1], start_point[0])
 
@@ -104,9 +132,9 @@ def getCentreLine(map_name):
 	visited = {}
 	centerline_points = []
 	track_widths = []
-	# DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+	DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
 	# If you want the other direction first
-	DIRECTIONS = [(0, -1), (-1, 0),  (0, 1), (1, 0), (-1, 1), (-1, -1), (1, 1), (1, -1) ]
+	# DIRECTIONS = [(0, -1), (-1, 0),  (0, 1), (1, 0), (-1, 1), (-1, -1), (1, 1), (1, -1) ]
 
 	def dfs(point):
 		if (point in visited): return
@@ -115,7 +143,7 @@ def getCentreLine(map_name):
 		track_widths.append(np.array([centerline_dist[point[1]][point[0]], centerline_dist[point[1]][point[0]]]))
 		for direction in DIRECTIONS:
 			if (centerline_dist[point[1] + direction[1]][point[0] + direction[0]] != NON_EDGE and (point[0] + direction[0], point[1] + direction[1]) not in visited):
-				print(centerline[point[1] + direction[1]][point[0] + direction[0]])
+				# print(centerline[point[1] + direction[1]][point[0] + direction[0]])
 				dfs((point[0] + direction[0], point[1] + direction[1]))
 
 	dfs(starting_point)
@@ -145,8 +173,13 @@ def getCentreLine(map_name):
 	# Set the step size of the track in meters
 	transformed_data = tph.interp_track.interp_track(transformed_data, 0.1)
 
+	# Get track data
+	tansformed_track = CentreLine(transformed_data)
+
+	# save = transformed_data
+	save = tansformed_track.data_save
 	with open(f"maps/{map_name}_centreline.csv", 'wb') as fh:
-		np.savetxt(fh, transformed_data, fmt='%0.16f', delimiter=',', header='x_m,y_m,w_tr_right_m,w_tr_left_m')
+		np.savetxt(fh, save, fmt='%0.16f', delimiter=',', header='x_m,y_m,w_tr_right_m,w_tr_left_m,psi,kappa,s,velocity,acceleration,time')
 	
 	# transformed_data = smooth_centre_line(transformed_data)
 
@@ -157,29 +190,30 @@ def getCentreLine(map_name):
 	# with open(f"maps/{map_name}_centreline_smooth.csv", 'wb') as fh:
 	# 	np.savetxt(fh, transformed_data, fmt='%0.16f', delimiter=',', header='x_m,y_m,w_tr_right_m,w_tr_left_m')
 
-	raw_data = pd.read_csv(f"maps/{map_name}_centreline.csv")
-	x = raw_data["# x_m"].values
-	y = raw_data["y_m"].values
-	wr = raw_data["w_tr_right_m"].values
-	wl = raw_data["w_tr_left_m"].values
+	# raw_data = pd.read_csv(f"maps/{map_name}_centreline.csv")
+	# x = raw_data["# x_m"].values
+	# y = raw_data["y_m"].values
+	# wr = raw_data["w_tr_right_m"].values
+	# wl = raw_data["w_tr_left_m"].values
 
-	x -= orig_x
-	y -= orig_y
+	# x -= orig_x
+	# y -= orig_y
 
-	x /= map_resolution
-	y /= map_resolution
-	plt.figure()
-	plt.imshow(map_img, cmap="gray", origin="lower")
-	plt.plot(x,y)
-	plt.show()
+	# x /= map_resolution
+	# y /= map_resolution
+	# plt.figure()
+	# plt.imshow(map_img, cmap="gray", origin="lower")
+	# plt.plot(x,y)
+	# plt.show()
+
 
 def main():
 	for file in os.listdir('maps/'):
 		if file.endswith('.png'):
 			map_name = file.split('.')[0]
-			if not os.path.exists(f"maps/{map_name}_centreline.csv"):
-				print(f"Extracting centre line for: {map_name}")
-				getCentreLine(map_name)
+			# if not os.path.exists(f"maps/{map_name}_centreline.csv"):
+			print(f"Extracting centre line for: {map_name}")
+			getCentreLine(map_name)
 
 
 if __name__ == "__main__":

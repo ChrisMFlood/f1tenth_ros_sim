@@ -20,6 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'pure_pursuit = control.pure_pursuit:main',
+            'stanley = control.stanley:main',
         ],
     },
 )
