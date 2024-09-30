@@ -13,8 +13,8 @@ class myNode(Node):
 	def __init__(self):
 		super().__init__("stanley") 
 		# Parameters
-		self.declare_parameter("ke", 5)
-		self.declare_parameter("kv", 1)
+		self.declare_parameter("ke", 6)
+		self.declare_parameter("kv", 2)
 		self.declare_parameter("wheel_base", 0.33)
 		self.declare_parameter("min_speed", 0.1)
 		self.declare_parameter("max_steering_angle", 0.4)
