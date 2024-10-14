@@ -6,7 +6,7 @@ import cv2 as cv
 import yaml
 
 def load_parameter_file(paramFile):
-	file_name = f"params/{paramFile}.yaml"
+	file_name = f"/home/chris/sim_ws/src/global_planning/params/{paramFile}.yaml"
 	with open(file_name, 'r') as file:
 		params = yaml.load(file, Loader=yaml.FullLoader)    
 	return params

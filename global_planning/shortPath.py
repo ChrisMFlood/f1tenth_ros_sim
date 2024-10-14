@@ -15,7 +15,7 @@ def load_parameter_file(paramFile):
 class CentreLine:
 	def __init__(self, track_path):
 		track = np.loadtxt(track_path, delimiter=',', skiprows=1)
-		self.track = tph.interp_track.interp_track(track, 0.1)
+		self.track = tph.interp_track.interp_track(track, 0.2)
 		self.path = self.track[:, :2]
 		self.widths = self.track[:, 2:4]
 		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)

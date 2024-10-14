@@ -10,6 +10,7 @@ import pandas as pd
 import trajectory_planning_helpers as tph
 import sys
 from velocityProfile import generateVelocityProfile
+from smoothLine import run_smoothing_process
 
 class CentreLine:
 	def __init__(self, track):
@@ -23,7 +24,10 @@ class CentreLine:
 
 		coeffs_x, coeffs_y, A, normvec_normalized = tph.calc_splines.calc_splines(self.closed_path, self.closed_el_lengths)
 
-		alpha, error = tph.opt_min_curv.opt_min_curv(track, normvec_normalized, A, 1, 0, print_debug=True, closed=True)
+		w = self.widths*0.1
+		t = np.column_stack((self.path, w))
+
+		alpha, error = tph.opt_min_curv.opt_min_curv(t, normvec_normalized, A, 1, 0, print_debug=True, closed=True)
 		path,_,_,_,spline_inds_raceline_interp, t_values_raceline_interp,s,s_length,_ = tph.create_raceline.create_raceline(self.path, normvec_normalized, alpha, 0.1)
 		widths = np.copy(self.widths)
 		widths[:, 0] -= alpha
@@ -58,14 +62,14 @@ TRACK_WIDTH_MARGIN = 0.0 # Extra Safety margin, in meters
 def getCentreLine(map_name):
 	'''Extracts the centreline from the map image and saves it as a csv file'''
 	print(f"Extracting centre line for: {map_name}")
-	if os.path.exists(f"maps/{map_name}.png"):
-		map_img_path = f"maps/{map_name}.png"
-	elif os.path.exists(f"maps/{map_name}.pgm"):
-		map_img_path = f"maps/{map_name}.pgm"
+	if os.path.exists(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}.png"):
+		map_img_path = f"/home/chris/sim_ws/src/global_planning/maps/{map_name}.png"
+	elif os.path.exists(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}.pgm"):
+		map_img_path = f"/home/chris/sim_ws/src/global_planning/maps/{map_name}.pgm"
 	else:
 		raise Exception("Map not found!")
 
-	map_yaml_path = f"maps/{map_name}.yaml"
+	map_yaml_path = f"/home/chris/sim_ws/src/global_planning/maps/{map_name}.yaml"
 	raw_map_img = np.array(Image.open(map_img_path).transpose(Image.FLIP_TOP_BOTTOM))
 	raw_map_img = raw_map_img.astype(np.float64)
 
@@ -172,9 +176,13 @@ def getCentreLine(map_name):
 
 	# Set the step size of the track in meters
 	transformed_data = tph.interp_track.interp_track(transformed_data, 0.1)
+	print('smoothing centreline')
+	transformed_data = run_smoothing_process(transformed_data)
+	transformed_data = tph.interp_track.interp_track(transformed_data, 0.1)
 
 	# Get track data
 	tansformed_track = CentreLine(transformed_data)
+
 
 	# save = transformed_data
 	save = tansformed_track.data_save

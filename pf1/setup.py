@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             "pf_node = pf1.pf:main",
             'syn_pf = pf1.synpf:main',
+            'pf_new = pf1.pf_new:main',
         ],
     },
 )

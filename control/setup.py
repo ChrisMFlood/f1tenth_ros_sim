@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'pure_pursuit = control.pure_pursuit:main',
             'stanley = control.stanley:main',
+            'mpc = control.mpc:main',
         ],
     },
 )
