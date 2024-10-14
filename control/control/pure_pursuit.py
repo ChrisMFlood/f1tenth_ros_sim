@@ -19,7 +19,7 @@ class myNode(Node):
 		self.declare_parameter("wheel_base", 0.33)
 		self.declare_parameter("min_speed", 0.1)
 		self.declare_parameter("max_steering_angle", 0.4)
-		self.declare_parameter("map_name", "mco")
+		self.declare_parameter("map_name", "aut")
 
 		self.lookahead_distance = self.get_parameter("lookahead_distance").value
 		self.k = self.get_parameter("k").value
