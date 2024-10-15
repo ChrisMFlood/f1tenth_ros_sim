@@ -46,7 +46,7 @@ class controlData:
 		plt.plot(sx, sy, label=f'Stanley ({self.stanley_2[-1, 0]-self.stanley_1[-1,0]}s)')
 		plt.plot(px, py, label=f'Pure Pursuit ({self.pp_2[-1, 0]-self.pp_1[-1,0]}s)')
 		plt.legend()
-		plt.savefig(f"/home/chris/sim_ws/src/control/Results/Plots/{map_name}_paths.svg")
+		plt.savefig(f"/home/chris/sim_ws/src/control/Results/Plots/{map_name}_paths.png")
 		plt.show()
 
 		plt.figure(num = f'{map_name}_heading')
@@ -55,7 +55,7 @@ class controlData:
 		plt.plot(ss, self.stanley_2[:,3], label='Stanley')
 		plt.plot(ps, self.pp_2[:,3], label='Pure Pursuit')
 		plt.legend()
-		plt.savefig(f"/home/chris/sim_ws/src/control/Results/Plots/{map_name}_heading.svg")
+		plt.savefig(f"/home/chris/sim_ws/src/control/Results/Plots/{map_name}_heading.png")
 		plt.show()
 
 		plt.figure(num = f'{map_name}_speed')
@@ -64,7 +64,7 @@ class controlData:
 		plt.plot(ss, self.stanley_2[:,4], label='Stanley')
 		plt.plot(ps, self.pp_2[:,4], label='Pure Pursuit')
 		plt.legend()
-		plt.savefig(f"/home/chris/sim_ws/src/control/Results/Plots/{map_name}_speed.svg")
+		plt.savefig(f"/home/chris/sim_ws/src/control/Results/Plots/{map_name}_speed.png")
 		plt.show()
 
 		errors = np.zeros(len(self.stanley_2)) 
@@ -137,9 +137,9 @@ class controlData:
 
 	
 def main():
-	# controlData('mco')
-	# controlData('esp')
-	# controlData('gbr')
+	controlData('mco')
+	controlData('esp')
+	controlData('gbr')
 	controlData('aut')
 
 if __name__ == "__main__":

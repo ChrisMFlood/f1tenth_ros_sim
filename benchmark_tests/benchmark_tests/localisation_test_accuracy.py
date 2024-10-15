@@ -69,7 +69,7 @@ class localisation_test_accuracy(Node):
 
 		self.ds.saveData = np.vstack((self.ds.saveData, self.ds.tempData))
 		if self.ds.saveFlag:
-			self.ds.saveToFile(self.ds.saveData, 'cornerHall')
+			self.ds.saveToFile(self.ds.saveData, 'aut')
 			self.get_logger().info('saving to file')
 			# self.ds.saveFlag = False
 			rclpy.shutdown()
@@ -90,7 +90,7 @@ class saveToFile:
 		self.saveFlag = False
 
 	def saveToFile(self,data,map):
-		np.savetxt(fname='/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/'+map+'_1.csv', 
+		np.savetxt(fname='/home/chris/sim_ws/src/benchmark_tests/benchmark_tests/Results/Localisation/Accuracy/'+map+'_diffdrive.csv', 
 			 X=data, 
 			 delimiter=',',
 			#  newline=' /n', 
