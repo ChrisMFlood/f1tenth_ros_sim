@@ -84,7 +84,7 @@ class Track:
 		plt.plot(shortMinCurveX, shortMinCurveY, label=f'Minimum Curvature S({shortMinCurve[-1, -1]:.2f}s)')
 		# plt.plot(smoothed_centrelineX, smoothed_centrelineY, label='Smoothed Centreline')
 		plt.legend(loc='upper right')
-		plt.savefig(f"{output_dir}/{map_name}_racelines.svg")
+		# plt.savefig(f"{output_dir}/{map_name}_racelines.svg")
 		plt.show()
 
 		plt.figure( num=f'{map_name}_curvature')
@@ -95,7 +95,7 @@ class Track:
 		plt.plot(shortMinCurveS, shortMinCurve[:, 5], label='Minimum Curvature')
 		# plt.plot(smoothed_centrelineS, smoothed_centreline[:, 5], label='Smoothed Centreline')
 		plt.legend(loc='upper right')
-		plt.savefig(f"{output_dir}/{map_name}_curvature.svg")
+		# plt.savefig(f"{output_dir}/{map_name}_curvature.svg")
 		plt.show()
 
 		plt.figure( num=f'{map_name}_heading')
@@ -106,7 +106,7 @@ class Track:
 		plt.plot(shortMinCurveS, shortMinCurve[:, 4], label='Minimum Curvature')
 		# plt.plot(smoothed_centrelineS, smoothed_centreline[:, 4], label='Smoothed Centreline')
 		plt.legend(loc='upper right')
-		plt.savefig(f"{output_dir}/{map_name}_heading.svg")
+		# plt.savefig(f"{output_dir}/{map_name}_heading.svg")
 		plt.show()
 
 

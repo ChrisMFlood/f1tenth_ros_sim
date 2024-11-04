@@ -23,6 +23,7 @@ setup(
             'pure_pursuit = control.pure_pursuit:main',
             'stanley = control.stanley:main',
             'mpc = control.mpc:main',
+            'mpc2 = control.mpc_template:main',
         ],
     },
 )

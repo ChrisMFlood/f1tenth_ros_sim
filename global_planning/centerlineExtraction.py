@@ -175,7 +175,7 @@ def getCentreLine(map_name):
 	transformed_data -= np.array([0, 0, TRACK_WIDTH_MARGIN, TRACK_WIDTH_MARGIN])
 
 	# Set the step size of the track in meters
-	transformed_data = tph.interp_track.interp_track(transformed_data, 0.1)
+	transformed_data = tph.interp_track.interp_track(transformed_data, 0.5)
 	print('smoothing centreline')
 	transformed_data = run_smoothing_process(transformed_data)
 	transformed_data = tph.interp_track.interp_track(transformed_data, 0.1)

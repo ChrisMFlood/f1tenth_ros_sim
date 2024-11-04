@@ -166,7 +166,7 @@ class ParticleFiler(Node):
         self.rect_pub = self.create_publisher(PolygonStamped, '/pf/viz/poly1', 1)
 
         if self.PUBLISH_ODOM:
-            self.odom_pub = self.create_publisher(Odometry, '/pf/pose/odom', 1)
+            self.odom_pub = self.create_publisher(Odometry, '/pf/pose/odom1', 1)
 
         # these topics are for coordinate space things
         self.pub_tf = TransformBroadcaster(self)

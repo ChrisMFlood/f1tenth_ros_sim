@@ -69,11 +69,12 @@ def generateMinCurvaturePath(track_path):
 
 	alpha_mincurv_tmp, reftrack_tmp, normvectors_tmp, spline_len_tmp, psi_reftrack_tmp, kappa_reftrack_tmp, dkappa_reftrack_tmp = tph.iqp_handler.iqp_handler(reftrack, normvectors, A, spline_len, psi, kappa, dkappa, kappa_bound, w_veh, print_debug, plot_debug, stepsize_interp, iters_min, curv_error_allowed)
 	raceline, _,_,_, spline_inds, t_values = tph.create_raceline.create_raceline(reftrack_tmp[:, :2], normvectors_tmp, alpha_mincurv_tmp, racetrack_params["raceline_step"])[:6]
-	reftrack_tmp[:, 0] -= alpha_mincurv_tmp
-	reftrack_tmp[:, 1] += alpha_mincurv_tmp
-	new_widths = tph.interp_track_widths.interp_track_widths(reftrack_tmp[:, :2], spline_inds, t_values, incl_last_point=False)
+	reftrack_tmp[:, 2] -= alpha_mincurv_tmp
+	reftrack_tmp[:, 3] += alpha_mincurv_tmp
+	new_widths = tph.interp_track_widths.interp_track_widths(reftrack_tmp[:, 2:4], spline_inds, t_values, incl_last_point=False)
 	reftrack_tmp = np.column_stack((raceline, new_widths))
 	reftrack_tmp = tph.interp_track.interp_track(reftrack_tmp, 0.1)
+	track_data = Track(reftrack_tmp)
 
 	map_name = track_path.split('/')[-1].split('_')[0]
 	path_type = track_path.split('/')[-1].split('_')[-1].split('.')[0]
@@ -83,7 +84,6 @@ def generateMinCurvaturePath(track_path):
 		temp = track_path.split('/')[-1].split('.')[0].split('_')[-1]
 		ref = f'{map_name}_{temp}'
 
-	track_data = Track(reftrack_tmp)
 	
 	save_path = f"maps/{ref}_minCurve.csv"
 	with open(save_path, 'wb') as fh:

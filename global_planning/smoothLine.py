@@ -36,7 +36,7 @@ class Track:
 	
 		self.alpha, error = tph.opt_min_curv.opt_min_curv(self.track, self.nvecs, A, 1, 0, print_debug=True, closed=True)
 
-		self.path, A_raceline, coeffs_x_raceline, coeffs_y_raceline, self.spline_inds_raceline_interp, self.t_values_raceline_interp, s_raceline, spline_lengths_raceline, el_lengths_raceline_interp_cl = tph.create_raceline.create_raceline(self.path, self.nvecs, self.alpha, 0.5) 
+		self.path, A_raceline, coeffs_x_raceline, coeffs_y_raceline, self.spline_inds_raceline_interp, self.t_values_raceline_interp, s_raceline, spline_lengths_raceline, el_lengths_raceline_interp_cl = tph.create_raceline.create_raceline(self.path, self.nvecs, self.alpha, 1) 
 
 		self.widths[:, 0] -= self.alpha
 		self.widths[:, 1] += self.alpha
@@ -48,7 +48,7 @@ class Track:
 class CentreLine:
 	def __init__(self, track):
 		# track = np.loadtxt(track_path, delimiter=',', skiprows=1)[:,:4]
-		self.track = tph.interp_track.interp_track(track, 0.5)
+		self.track = tph.interp_track.interp_track(track, 1)
 		self.path = self.track[:, :2]
 		self.widths = self.track[:, 2:4]
 		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)

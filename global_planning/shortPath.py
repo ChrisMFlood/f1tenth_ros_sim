@@ -5,6 +5,7 @@ import os
 import cv2 as cv
 import yaml
 from velocityProfile import generateVelocityProfile
+from smoothLine import run_smoothing_process
 
 def load_parameter_file(paramFile):
 	file_name = f"params/{paramFile}.yaml"
@@ -12,10 +13,24 @@ def load_parameter_file(paramFile):
 		params = yaml.load(file, Loader=yaml.FullLoader)    
 	return params
 
+class Centre_Line:
+	def __init__(self, track):
+		self.track = tph.interp_track.interp_track(track, 0.2)
+		self.path = self.track[:, :2]
+		self.widths = self.track[:, 2:4]
+		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)
+		self.closed_path = np.row_stack([self.path, self.path[0]])
+		self.closed_el_lengths = np.linalg.norm(np.diff(self.closed_path, axis=0), axis=1)
+		self.coeffs_x, self.coeffs_y, self.A, self.normvec_normalized = tph.calc_splines.calc_splines(self.closed_path, self.closed_el_lengths)
+		self.spline_lengths = tph.calc_spline_lengths.calc_spline_lengths(self.coeffs_x, self.coeffs_y)
+		self.path_interp, self.spline_inds, self.t_values, self.dists_interp = tph.interp_splines.interp_splines(self.coeffs_x, self.coeffs_y, self.spline_lengths, False, 0.1)
+		self.psi, self.kappa, self.dkappa = tph.calc_head_curv_an.calc_head_curv_an(self.coeffs_x, self.coeffs_y, self.spline_inds, self.t_values, True, True)
+		self.normvectors = tph.calc_normal_vectors.calc_normal_vectors(self.psi)
+
 class CentreLine:
 	def __init__(self, track_path):
 		track = np.loadtxt(track_path, delimiter=',', skiprows=1)
-		self.track = tph.interp_track.interp_track(track, 0.2)
+		self.track = tph.interp_track.interp_track(track, 0.5)
 		self.path = self.track[:, :2]
 		self.widths = self.track[:, 2:4]
 		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)
@@ -32,6 +47,8 @@ class Track:
 		self.normvectors = tph.calc_normal_vectors.calc_normal_vectors(self.psi)
 		self.v, self.a, self.t = generateVelocityProfile(np.column_stack((self.path, self.widths)))
 		self.data_save = np.column_stack((self.path, self.widths, -self.psi, self.kappa, self.s_path, self.v, self.a, self.t))
+
+
 
 def generateShortestPath(centreline_path):
 	'''
@@ -62,6 +79,8 @@ def generateShortestPath(centreline_path):
 	centreline.widths[:, 1] += alpha
 	new_widths = tph.interp_track_widths.interp_track_widths(centreline.widths, spline_inds_raceline_interp, t_values_raceline_interp)
 	short_track = np.concatenate([path, new_widths], axis=1)
+	short_track = run_smoothing_process(short_track)
+	# short_track = iqp(short_track)
 	short_track = tph.interp_track.interp_track(short_track, 0.1)
 	track = Track(short_track)
 	savedata = track.data_save
