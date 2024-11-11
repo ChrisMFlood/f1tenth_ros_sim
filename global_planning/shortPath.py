@@ -8,14 +8,14 @@ from velocityProfile import generateVelocityProfile
 from smoothLine import run_smoothing_process
 
 def load_parameter_file(paramFile):
-	file_name = f"params/{paramFile}.yaml"
+	file_name = f"/home/chris/sim_ws/src/global_planning/params/{paramFile}.yaml"
 	with open(file_name, 'r') as file:
 		params = yaml.load(file, Loader=yaml.FullLoader)    
 	return params
 
 class Centre_Line:
 	def __init__(self, track):
-		self.track = tph.interp_track.interp_track(track, 0.2)
+		self.track = tph.interp_track.interp_track(track, 0.1)
 		self.path = self.track[:, :2]
 		self.widths = self.track[:, 2:4]
 		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)
@@ -30,7 +30,7 @@ class Centre_Line:
 class CentreLine:
 	def __init__(self, track_path):
 		track = np.loadtxt(track_path, delimiter=',', skiprows=1)
-		self.track = tph.interp_track.interp_track(track, 0.5)
+		self.track = tph.interp_track.interp_track(track, 0.1)
 		self.path = self.track[:, :2]
 		self.widths = self.track[:, 2:4]
 		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)
@@ -79,13 +79,13 @@ def generateShortestPath(centreline_path):
 	centreline.widths[:, 1] += alpha
 	new_widths = tph.interp_track_widths.interp_track_widths(centreline.widths, spline_inds_raceline_interp, t_values_raceline_interp)
 	short_track = np.concatenate([path, new_widths], axis=1)
-	short_track = run_smoothing_process(short_track)
+	# short_track = run_smoothing_process(short_track)
 	# short_track = iqp(short_track)
 	short_track = tph.interp_track.interp_track(short_track, 0.1)
 	track = Track(short_track)
 	savedata = track.data_save
 
-	save_path = f"maps/{ref}_short.csv"
+	save_path = f"/home/chris/sim_ws/src/global_planning/maps/{ref}_short.csv"
 
 	with open(save_path, 'wb') as fh:
 		np.savetxt(fh, savedata, fmt='%0.16f', delimiter=',', header='x_m,y_m,w_tr_right_m,w_tr_left_m,psi,kappa,s,velocity,acceleration,time')

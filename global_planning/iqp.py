@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from velocityProfile import generateVelocityProfile
 
 def load_parameter_file(paramFile):
-	file_name = f"params/{paramFile}.yaml"
+	file_name = f"/home/chris/sim_ws/src/global_planning/params/{paramFile}.yaml"
 	with open(file_name, 'r') as file:
 		params = yaml.load(file, Loader=yaml.FullLoader)    
 	return params
@@ -16,7 +16,7 @@ def load_parameter_file(paramFile):
 class CentreLine:
 	def __init__(self, track_path):
 		track = np.loadtxt(track_path, delimiter=',', skiprows=1)[:, 0:4]
-		self.track = tph.interp_track.interp_track(track, 0.2)
+		self.track = tph.interp_track.interp_track(track, 0.1)
 		self.path = self.track[:, :2]
 		self.widths = self.track[:, 2:4]
 		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)
@@ -85,7 +85,7 @@ def generateMinCurvaturePath(track_path):
 		ref = f'{map_name}_{temp}'
 
 	
-	save_path = f"maps/{ref}_minCurve.csv"
+	save_path = f"/home/chris/sim_ws/src/global_planning/maps/{ref}_minCurve.csv"
 	with open(save_path, 'wb') as fh:
 		np.savetxt(fh, track_data.data_save, fmt='%0.16f', delimiter=',', header='x_m,y_m,w_tr_right_m,w_tr_left_m,psi,kappa,s,velocity,acceleration,time')
 

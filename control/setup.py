@@ -24,6 +24,7 @@ setup(
             'stanley = control.stanley:main',
             'mpc = control.mpc:main',
             'mpc2 = control.mpc_template:main',
+            'mpc3 = control.mpc_tmp:main',
         ],
     },
 )

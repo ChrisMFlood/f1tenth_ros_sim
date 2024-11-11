@@ -36,6 +36,10 @@ class controlData:
 		self.pp_1 = self.pp[self.pp[:, 5] == 0]
 		self.pp_2 = self.pp[self.pp[:, 5] != 0]
 		px, py, ps = self.processTrack(self.pp_2[:, 1:3])
+		self.mpc = np.loadtxt(f'/home/chris/sim_ws/src/control/Results/Data/{map_name}_mpc_x5.csv', delimiter=',', skiprows=1)
+		self.mpc_1 = self.mpc[self.mpc[:, 5] == 0]
+		self.mpc_2 = self.mpc[self.mpc[:, 5] != 0]
+		mx, my, ms = self.processTrack(self.mpc_2[:, 1:3])
 
 
 
@@ -45,27 +49,30 @@ class controlData:
 		plt.plot(wx, wy, label=f'Waypoints ({self.waypoints[-1, 9]}s)')
 		plt.plot(sx, sy, label=f'Stanley ({self.stanley_2[-1, 0]-self.stanley_1[-1,0]}s)')
 		plt.plot(px, py, label=f'Pure Pursuit ({self.pp_2[-1, 0]-self.pp_1[-1,0]}s)')
+		plt.plot(mx, my, label=f'MPC ({self.mpc_2[-1, 0]-self.mpc_1[-1,0]}s)')
 		plt.legend()
 		plt.savefig(f"/home/chris/sim_ws/src/control/Results/Plots/{map_name}_paths.png")
-		# plt.show()
+		plt.show()
 
 		plt.figure(num = f'{map_name}_heading')
 		plt.title(f'{map_name} heading')
 		plt.plot(ws, self.waypoints[:, 4], label='Waypoints')
 		plt.plot(ss, self.stanley_2[:,3], label='Stanley')
 		plt.plot(ps, self.pp_2[:,3], label='Pure Pursuit')
+		plt.plot(ms, self.mpc_2[:,3], label='MPC')
 		plt.legend()
 		plt.savefig(f"/home/chris/sim_ws/src/control/Results/Plots/{map_name}_heading.png")
-		# plt.show()
+		plt.show()
 
 		plt.figure(num = f'{map_name}_speed')
 		plt.title(f'{map_name} speed')
 		plt.plot(ws, self.waypoints[:, 7], label='Waypoints')
 		plt.plot(ss, self.stanley_2[:,4], label='Stanley')
 		plt.plot(ps, self.pp_2[:,4], label='Pure Pursuit')
+		plt.plot(ms, self.mpc_2[:,4], label='MPC')
 		plt.legend()
 		plt.savefig(f"/home/chris/sim_ws/src/control/Results/Plots/{map_name}_speed.png")
-		# plt.show()
+		plt.show()
 
 		errors = np.zeros(len(self.stanley_2)) 
 		heading_errors = np.zeros((len(self.stanley_2)))
@@ -90,6 +97,18 @@ class controlData:
 		print(f'Mean heading error PP {map_name}: {np.mean(heading_errors)}')
 		print(f'Standard deviation heading PP {map_name}: {np.std(heading_errors)}')
 		print(f'Time PP {map_name}: {self.pp_2[-1, 0]-self.pp_1[-1,0]}s')
+
+		errors = np.zeros(len(self.mpc_2))
+		heading_errors = np.zeros((len(self.mpc_2)))
+		for i,point in enumerate(self.mpc_2):
+			distance,j = self.nearest_point(point[1:3])
+			errors[i] = distance
+			heading_errors[i] = np.abs(point[3] - self.waypoints[j, 4])
+		print(f'Mean cross error MPC {map_name}: {np.mean(errors)}')
+		print(f'Standard deviation cross MPC {map_name}: {np.std(errors)}')
+		print(f'Mean heading error MPC {map_name}: {np.mean(heading_errors)}')
+		print(f'Standard deviation heading MPC {map_name}: {np.std(heading_errors)}')
+		print(f'Time MPC {map_name}: {self.mpc_2[-1, 0]-self.mpc_1[-1,0]}s')
 
 	def processTrack(self, track):
 		x = track[:, 0]
@@ -140,9 +159,9 @@ class controlData:
 
 	
 def main():
-	# controlData('mco')
-	# controlData('esp')
-	# controlData('gbr')
+	controlData('mco')
+	controlData('esp')
+	controlData('gbr')
 	controlData('aut')
 
 if __name__ == "__main__":

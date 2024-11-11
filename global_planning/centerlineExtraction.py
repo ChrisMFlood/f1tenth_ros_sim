@@ -152,7 +152,7 @@ def getCentreLine(map_name):
 
 	dfs(starting_point)
 
-	track_widths_np = np.array(track_widths)
+	track_widths_np = np.array(track_widths)*0.9
 	waypoints = np.array(centerline_points)
 	print(f"Track widths shape: {track_widths_np.shape}, waypoints shape: {waypoints.shape}")
 
@@ -175,9 +175,9 @@ def getCentreLine(map_name):
 	transformed_data -= np.array([0, 0, TRACK_WIDTH_MARGIN, TRACK_WIDTH_MARGIN])
 
 	# Set the step size of the track in meters
-	transformed_data = tph.interp_track.interp_track(transformed_data, 0.5)
-	print('smoothing centreline')
-	transformed_data = run_smoothing_process(transformed_data)
+	# transformed_data = tph.interp_track.interp_track(transformed_data, 0.1)
+	# print('smoothing centreline')
+	# transformed_data = run_smoothing_process(transformed_data)
 	transformed_data = tph.interp_track.interp_track(transformed_data, 0.1)
 
 	# Get track data
@@ -186,7 +186,7 @@ def getCentreLine(map_name):
 
 	# save = transformed_data
 	save = tansformed_track.data_save
-	with open(f"maps/{map_name}_centreline.csv", 'wb') as fh:
+	with open(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv", 'wb') as fh:
 		np.savetxt(fh, save, fmt='%0.16f', delimiter=',', header='x_m,y_m,w_tr_right_m,w_tr_left_m,psi,kappa,s,velocity,acceleration,time')
 	
 	# transformed_data = smooth_centre_line(transformed_data)

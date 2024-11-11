@@ -14,7 +14,6 @@ class Track:
 		- centreline: maps/{map_name}_centreline.csv
 		- shortest path: maps/{map_name}_short.csv
 		- minimum curvature path: maps/{map_name}_minCurve.csv
-		- shortest path based on minimum curvature path: maps/{map_name}_minCurve_short.csv
 		- minimum curvature path based on shortest path: maps/{map_name}_short_minCurve.csv
 
 		Plots:
@@ -42,13 +41,13 @@ class Track:
 		# generateMinCurvaturePath(f"maps/{map_name}_centreline.csv")
 		# generateMinCurvaturePath(f"maps/{map_name}_short.csv")
 
-		map_yaml_path = f"maps/{map_name}.yaml"
-		map_img = plt.imread(f'maps/{map_name}.png')
-		centreline = np.loadtxt(f"maps/{map_name}_centreline.csv", delimiter=',')
+		map_yaml_path = f"/home/chris/sim_ws/src/global_planning/maps/{map_name}.yaml"
+		map_img = plt.imread(f'/home/chris/sim_ws/src/global_planning/maps/{map_name}.png')
+		centreline = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv", delimiter=',')
 		# smoothed_centreline = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/smooth_test/{map_name}_centerline.csv", delimiter=',')
-		short = np.loadtxt(f"maps/{map_name}_short.csv", delimiter=',')
+		short = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short.csv", delimiter=',')
 		# minCurve = np.loadtxt(f"maps/{map_name}_minCurve.csv", delimiter=',')
-		shortMinCurve = np.loadtxt(f"maps/{map_name}_short_minCurve.csv", delimiter=',')
+		shortMinCurve = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short_minCurve.csv", delimiter=',')
 		# flip the image around x axis
 		map_img = np.flipud(map_img)
 		map_img = scipy.ndimage.distance_transform_edt(map_img)

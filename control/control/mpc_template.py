@@ -53,7 +53,7 @@ class mpc_config:
 	MAX_STEER: float = 0.4189  # maximum steering angle [rad]
 	MAX_DSTEER: float = np.deg2rad(180.0)  # maximum steering speed [rad/s]
 	MAX_STEER_V: float = 3.2  # maximum steering speed [rad/s]
-	MAX_SPEED: float = 2.0  # maximum speed [m/s] ~ 5.0 for levine sim
+	MAX_SPEED: float = 8.0  # maximum speed [m/s] ~ 5.0 for levine sim
 	MIN_SPEED: float = 0.0  # minimum backward speed [m/s]
 	MAX_ACCEL: float = 3.0  # maximum acceleration [m/ss]
 
@@ -78,7 +78,7 @@ class MPC(Node):
 		super().__init__('mpc_node')
 		# use the MPC as a tracker (similar to pure pursuit)
 		self.is_real = False
-		self.map_name = 'aut'
+		self.map_name = 'esp'
 
 		# create ROS subscribers and publishers
 		pose_topic = "/pf/viz/inferred_pose" if self.is_real else "/ego_racecar/odom"
@@ -105,6 +105,7 @@ class MPC(Node):
 		if self.map_name == 'levine_2nd':
 			self.waypoints[:, 3] += math.pi / 2
 		self.visualize_waypoints_in_rviz()
+		self.waypointStepSize = np.mean(self.waypoints[1:,6] - self.waypoints[:-1,6])
 
 		self.config = mpc_config()
 		self.odelta_v = None
@@ -146,6 +147,8 @@ class MPC(Node):
 			ov,
 			state_predict,
 		) = self.linear_mpc_control(ref_path, x0, self.oa, self.odelta_v)
+		p=np.array([ox,oy,ov,oyaw])
+		self.visualize_pred_path_in_rviz(p)
 
 		# publish drive message.
 		steer_output = self.odelta_v[0]
@@ -153,7 +156,7 @@ class MPC(Node):
 
 		self.drive_msg.drive.steering_angle = steer_output
 		self.drive_msg.drive.speed = (-1.0 if self.is_real else 1.0) * speed_output
-		# self.drive_pub.publish(self.drive_msg)
+		self.drive_pub.publish(self.drive_msg)
 		print("steering ={}, speed ={}".format(self.drive_msg.drive.steering_angle, self.drive_msg.drive.speed))
 
 		self.vis_waypoints_pub.publish(self.vis_waypoints_msg)
@@ -380,8 +383,9 @@ class MPC(Node):
 
 		# based on current velocity, distance traveled on the ref line between time steps
 		travel = abs(state.v) * self.config.DTK
-		dind = travel / self.config.dlk
-		dind = 2
+		# dind = travel / self.config.dlk
+		dind = travel / self.waypointStepSize
+		# dind = 2
 		ind_list = int(ind) + np.insert(
 			np.cumsum(np.repeat(dind, self.config.TK)), 0, 0
 		).astype(int)
@@ -544,7 +548,7 @@ class MPC(Node):
 		# Call the Motion Prediction function: Predict the vehicle motion for x-steps
 		path_predict = self.predict_motion(x0, oa, od, ref_path)
 		# sth to be done to fix the path?
-		self.visualize_pred_path_in_rviz(path_predict)
+		# self.visualize_pred_path_in_rviz(path_predict)
 
 		poa, pod = oa[:], od[:]
 
