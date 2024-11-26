@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, Joy
 from ackermann_msgs.msg import AckermannDriveStamped
 from control import utils as Utils
 import numpy as np
@@ -22,7 +22,7 @@ class myNode(Node):
 		self.declare_parameter("fast_speed", 6.0)
 		self.declare_parameter("corners_speed", 3.0)
 		self.declare_parameter("straights_speed", 8.0)
-		self.declare_parameter('speed_gain',1)
+		self.declare_parameter('speed_gain',0.5)
 
 		self.max_lidar_dist = self.get_parameter("max_lidar_dist").value
 		self.preprocess_conv_size = self.get_parameter("preprocess_conv_size").value
@@ -38,8 +38,12 @@ class myNode(Node):
 		
 		# Subscribers
 		self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, 10)
+		self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, 10)
 		# Pulishers
 		self.cmd_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
+		
+	def joy_callback(self, msg: Joy):
+		self.Joy7 = msg.buttons[7]
 		
 	def lidar_callback(self, laserScan: LaserScan):
 		proc_ranges = self.preprocessScan(laserScan.ranges)
@@ -55,15 +59,18 @@ class myNode(Node):
 
 		best = self.find_best_point(gap_start, gap_end, proc_ranges)
 
-		steering_angle = self.get_angle(best, len(proc_ranges))
-
-		# TODO: Implement better speed control
-		if abs(steering_angle) > self.straights_steering_angle:
-			speed = self.corners_speed
-		elif abs(steering_angle) > self.fast_steering_angle:
-			speed = self.fast_speed
+		if self.Joy7:
+			steering_angle = self.get_angle(best, len(proc_ranges))
+			# TODO: Implement better speed control
+			if abs(steering_angle) > self.straights_steering_angle:
+				speed = self.corners_speed
+			elif abs(steering_angle) > self.fast_steering_angle:
+				speed = self.fast_speed
+			else:
+				speed = self.straights_speed
 		else:
-			speed = self.straights_speed
+			steering_angle = 0
+			speed = 0
 
 		Utils.pubishActuation(steering_angle, speed*self.speed_gain, self.cmd_pub)
 
