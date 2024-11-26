@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'pure_pursuit = control.pure_pursuit:main',
             'stanley = control.stanley:main',
+            'follow_the_gap = control.follow_the_gap:main',
             'mpc = control.mpc:main',
             'mpc2 = control.mpc_template:main',
             'mpc3 = control.mpc_tmp:main',

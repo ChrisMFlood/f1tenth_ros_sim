@@ -41,14 +41,15 @@ class myNode(Node):
 		super().__init__("MPC_Node")  
 		self.get_logger().info('MPC Node Started')
 		# Parameters
-		self.declare_parameter("odom_topic","/ego_racecar/odom")
+		# self.declare_parameter("odom_topic","/ego_racecar/odom")
+		self.declare_parameter("odom_topic","/pf/pose/odom")
 		self.odom_topic = self.get_parameter("odom_topic").value
 
 		self.declare_parameter("map", 'esp')
 		self.declare_parameter("dt", 0.1)
 		self.declare_parameter("time_step_horizon", 5)
 		self.declare_parameter("wheel_base", 0.33)
-		self.declare_parameter("MAX_SPEED", 9.0)
+		self.declare_parameter("MAX_SPEED", 4.0)
 		self.declare_parameter("MIN_SPEED", 0.0)
 		self.declare_parameter("MAX_ACCEL", 10.0)
 		self.declare_parameter("MAX_STEER", 0.41)

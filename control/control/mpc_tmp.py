@@ -36,7 +36,8 @@ class myNode(Node):
 		super().__init__("MPC_Node")  
 		self.get_logger().info('MPC Node Started')
 		# Parameters
-		self.declare_parameter("odom_topic","/ego_racecar/odom")
+		# self.declare_parameter("odom_topic","/ego_racecar/odom")
+		self.declare_parameter("odom_topic","/pf/pose/odom")
 		self.odom_topic = self.get_parameter("odom_topic").value
 
 		self.declare_parameter("map", 'esp')

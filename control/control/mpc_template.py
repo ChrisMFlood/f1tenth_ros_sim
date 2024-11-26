@@ -81,7 +81,7 @@ class MPC(Node):
 		self.map_name = 'esp'
 
 		# create ROS subscribers and publishers
-		pose_topic = "/pf/viz/inferred_pose" if self.is_real else "/ego_racecar/odom"
+		pose_topic = "/pf/viz/inferred_pose" #if self.is_real else "/ego_racecar/odom"
 		drive_topic = "/drive"
 		vis_ref_traj_topic = "/ref_traj_marker"
 		vis_waypoints_topic = "/waypoints_marker"

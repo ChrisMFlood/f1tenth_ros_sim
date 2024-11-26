@@ -6,7 +6,7 @@ from nav_msgs.msg import Odometry
 import numpy as np
 from visualization_msgs.msg import Marker
 from ackermann_msgs.msg import AckermannDriveStamped
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, Pose
 import math
 import time
   
@@ -14,12 +14,14 @@ class myNode(Node):
 	def __init__(self):
 		super().__init__("pure_pursuit")
 		# Parameters
+		self.declare_parameter("odom_topic","/pf/pose/odom")
+		self.odom_topic = self.get_parameter("odom_topic").value
 		self.declare_parameter("lookahead_distance", 1)
 		self.declare_parameter("k", 0.5)
 		self.declare_parameter("wheel_base", 0.33)
 		self.declare_parameter("min_speed", 0.1)
 		self.declare_parameter("max_steering_angle", 0.4)
-		self.declare_parameter("map_name", "aut")
+		self.declare_parameter("map_name", "esp")
 
 		self.lookahead_distance = self.get_parameter("lookahead_distance").value
 		self.k = self.get_parameter("k").value
@@ -29,14 +31,18 @@ class myNode(Node):
 		self.map_name = self.get_parameter("map_name").value
 
 		# Subscribers
-		self.odom_sub = self.create_subscription(Odometry, "/ego_racecar/odom", self.odom_callback, 10)
+		self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 		# Publishers
 		self.cmd_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
 		self.marker_pub = self.create_publisher(Marker, "/waypoint_marker", 10)
 		self.initial_position_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose",10)
+		self.waypoints_pub = self.create_publisher(PoseArray, 'waypoints', 10)
+		self.ref_traj_pub = self.create_publisher(PoseArray, 'reference_trajectory', 10)
+		self.calc_ref_traj_pub = self.create_publisher(PoseArray, 'calculated_trajectory', 10)
 
 		# Waypoints
 		self.waypoints = np.loadtxt(f'src/global_planning/maps/{self.map_name}_short_minCurve.csv', delimiter=',', skiprows=1)
+		self.publishTrajectory(self.waypoints[:,0], self.waypoints[:,1], self.waypoints[:,4], self.waypoints_pub)
 
 		# Variables 
 		self.initial_position_ = False
@@ -73,6 +79,35 @@ class myNode(Node):
 		distance = np.linalg.norm(self.waypoints[:, :2] - self.pose[:2], axis=1)
 		closest_index = np.argmin(distance)
 		return closest_index
+	
+	def publishTrajectory(self, x,y,yaw, publisher):
+		poseArray = PoseArray()
+		poseArray.header.frame_id = 'map'
+		poseArray.poses = []
+		for i in range(x.shape[0]):
+			pose = Pose()
+			pose.position.x = x[i]
+			pose.position.y = y[i]
+			qw,qx,qy,qz = self.quaternion_from_euler(0,0,yaw[i])
+			pose.orientation.w = qw
+			pose.orientation.x = qx
+			pose.orientation.y = qy
+			pose.orientation.z = qz
+			poseArray.poses.append(pose)
+		publisher.publish(poseArray)
+
+	def quaternion_from_euler(self, roll, pitch, yaw):
+		cy = math.cos(yaw * 0.5)
+		sy = math.sin(yaw * 0.5)
+		cr = math.cos(roll * 0.5)
+		sr = math.sin(roll * 0.5)
+		cp = math.cos(pitch * 0.5)
+		sp = math.sin(pitch * 0.5)
+		w = cy * cr * cp + sy * sr * sp
+		x = cy * sr * cp - sy * cr * sp
+		y = cy * cr * sp + sy * sr * cp
+		z = sy * cr * cp - cy * sr * sp
+		return w,x,y,z
 	
 	def getLookAheadDistance(self):
 		lookahead_distance = 0.5 + self.k/np.abs(self.waypoints[self.closest_index,5]) * 0.15

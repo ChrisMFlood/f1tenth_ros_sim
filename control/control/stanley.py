@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
@@ -10,42 +8,48 @@ import math
 import trajectory_planning_helpers as tph
 import time
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseArray, Pose
 
-# class Utils:
-# 	def __init__(self):
-		
+from control import utils as Utils
 
-	
-  
 class myNode(Node):
 	def __init__(self):
 		super().__init__("stanley") 
 		self.get_logger().info('Stanley controller started')
 		# Parameters
-		self.declare_parameter("ke", 10)
+		self.declare_parameter("odom_topic","/ego_racecar/odom")
+		# self.declare_parameter("odom_topic","/pf/pose/odom")
+		self.odom_topic = self.get_parameter("odom_topic").value
+		self.declare_parameter("ke", 1)
 		self.declare_parameter("kv", 0.0)
 		self.declare_parameter("wheel_base", 0.33)
 		self.declare_parameter("min_speed", 0.1)
+		self.declare_parameter("max_speed", 8)
 		self.declare_parameter("max_steering_angle", 0.4)
-		self.declare_parameter("map_name", "aut")
+		self.declare_parameter("map_name", "esp")
 
 		self.k = self.get_parameter("ke").value
 		self.wheel_base = self.get_parameter("wheel_base").value
 		self.min_speed = self.get_parameter("min_speed").value
+		self.max_speed = self.get_parameter("max_speed").value
 		self.max_steering_angle = self.get_parameter("max_steering_angle").value
 		self.map_name = self.get_parameter("map_name").value
 		self.kv = self.get_parameter("kv").value
 
 		# Subscribers
-		self.odom_sub = self.create_subscription(Odometry, "/ego_racecar/odom", self.odom_callback, 10)
+		self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 		# Publishers
 		self.cmd_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
 		# self.marker_pub = self.create_publisher(Marker, "/waypoint_marker", 10)
 		self.publisher = self.create_publisher(MarkerArray, 'visualization_marker_array', 10)
 		self.initial_position_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose",10)
+		self.waypoints_pub = self.create_publisher(PoseArray, 'waypoints', 10)
+		self.ref_traj_pub = self.create_publisher(PoseArray, 'reference_trajectory', 10)
+		self.calc_ref_traj_pub = self.create_publisher(PoseArray, 'calculated_trajectory', 10)
 
 		# Waypoints
 		self.waypoints = np.loadtxt(f'src/global_planning/maps/{self.map_name}_short_minCurve.csv', delimiter=',', skiprows=1)
+		Utils.publishTrajectory(self.waypoints[:,0], self.waypoints[:,1], self.waypoints[:,4], self.waypoints_pub)
 
 		# Variables  
 		self.odom: Odometry = None
@@ -72,7 +76,7 @@ class myNode(Node):
 			self.start = False
 
 		self.odom = msg
-		self.yaw = self.euler_from_quaternion(self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y, self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w) 
+		self.yaw = Utils.euler_from_quaternion(self.odom.pose.pose.orientation.x, self.odom.pose.pose.orientation.y, self.odom.pose.pose.orientation.z, self.odom.pose.pose.orientation.w) 
 		self.pose = np.array([self.odom.pose.pose.position.x, self.odom.pose.pose.position.y, self.yaw])
 		self.speed = self.odom.twist.twist.linear.x
 		self.current_time = time.time() - self.start_time
@@ -84,6 +88,8 @@ class myNode(Node):
 		self.getHeadingError()
 		self.actuation()
 		# self.visualiseMarker()
+
+
 
 	def getLapProgress(self):
 		distance = np.linalg.norm(self.waypoints[:, :2] - self.pose[:2], axis=1)
@@ -136,7 +142,7 @@ class myNode(Node):
 		self.headingError =  self.normalize_angle(pathHeading - carHeading)
 
 	def actuation(self):
-		speed = np.max([self.waypoints[self.closest_index,7],0.1])
+		speed = np.min([np.max([self.waypoints[self.closest_index,7],0.1]),self.max_speed])
 		steering_angle = (self.headingError + math.atan2(self.k*self.crossTrackError,speed+(self.kv/np.abs(self.crossTrackError))))
 		steering_angle = np.clip(self.normalize_angle(steering_angle), -self.max_steering_angle, self.max_steering_angle)
 		cmd = AckermannDriveStamped()
@@ -146,35 +152,6 @@ class myNode(Node):
 		cmd.drive.speed = speed
 		self.cmd_pub.publish(cmd)
 
-	def visualiseMarker(self):
-		marker = Marker()
-		marker.header.frame_id = "map"
-		marker.header.stamp = self.get_clock().now().to_msg()
-		marker.type = Marker.SPHERE
-		marker.action = Marker.ADD
-		# marker.pose.position.x = self.waypoints[self.closest_index, 0]
-		# marker.pose.position.y = self.waypoints[self.closest_index, 1]
-		marker.pose.position.x = self.frontAxle[0]
-		marker.pose.position.y = self.frontAxle[1]
-		marker.pose.position.z = 0.0
-		marker.pose.orientation.x = 0.0
-		marker.pose.orientation.y = 0.0
-		marker.pose.orientation.z = 0.0
-		marker.pose.orientation.w = 1.0
-		marker.scale.x = 0.1
-		marker.scale.y = 0.1
-		marker.scale.z = 0.1
-		marker.color.a = 1.0
-		marker.color.r = 0.0
-		marker.color.g = 1.0
-		marker.color.b = 0.0
-		self.marker_pub.publish(marker)
-	
-	def euler_from_quaternion(self,x, y, z, w):  
-		t3 = +2.0 * (w * z + x * y)
-		t4 = +1.0 - 2.0 * (y * y + z * z)
-		yaw_z = math.atan2(t3, t4)
-		return yaw_z # in radians
 	
 	def normalize_angle(self, angle):
 		if angle > np.pi:
@@ -212,9 +189,7 @@ class myNode(Node):
 			self.get_logger().info('Initial position set')
 			self.initial_position_ = True
 	
-class SaveData:
-	def __init__(self):
-		self.a =1
+
   
 def main(args=None):
 	rclpy.init(args=args)

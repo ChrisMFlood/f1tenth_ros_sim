@@ -108,6 +108,17 @@ class Track:
 		# plt.savefig(f"{output_dir}/{map_name}_heading.svg")
 		plt.show()
 
+		plt.figure( num=f'{map_name}_velocity')
+		plt.title(f'Velocity vs Distance {map_name}')
+		plt.plot(centrelineS, centreline[:, 7], label='Centreline')
+		plt.plot(shortS, short[:, 7], label='Shortest Path')
+		# plt.plot(minCurveS, minCurve[:, 3], label='Minimum Curvature (C)')
+		plt.plot(shortMinCurveS, shortMinCurve[:, 7], label='Minimum Curvature')
+		# plt.plot(smoothed_centrelineS, smoothed_centreline[:, 3], label='Smoothed Centreline')
+		plt.legend(loc='upper right')
+		# plt.savefig(f"{output_dir}/{map_name}_velocity.svg")
+		plt.show()
+
 
 
 	def processTrack(self, track):
