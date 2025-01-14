@@ -4,7 +4,6 @@ import numpy as np
 import os
 import cv2 as cv
 import yaml
-import matplotlib.pyplot as plt
 from velocityProfile import generateVelocityProfile
 
 def load_parameter_file(paramFile):
@@ -13,9 +12,8 @@ def load_parameter_file(paramFile):
 		params = yaml.load(file, Loader=yaml.FullLoader)    
 	return params
 
-class CentreLine:
-	def __init__(self, track_path):
-		track = np.loadtxt(track_path, delimiter=',', skiprows=1)[:, 0:4]
+class Centre_Line:
+	def __init__(self, track):
 		self.track = tph.interp_track.interp_track(track, 0.1)
 		self.path = self.track[:, :2]
 		self.widths = self.track[:, 2:4]
@@ -28,8 +26,18 @@ class CentreLine:
 		self.psi, self.kappa, self.dkappa = tph.calc_head_curv_an.calc_head_curv_an(self.coeffs_x, self.coeffs_y, self.spline_inds, self.t_values, True, True)
 		self.normvectors = tph.calc_normal_vectors.calc_normal_vectors(self.psi)
 
+class CentreLine:
+	def __init__(self, track_path):
+		track = np.loadtxt(track_path, delimiter=',', skiprows=1)
+		self.track = tph.interp_track.interp_track(track, 0.1)
+		self.path = self.track[:, :2]
+		self.widths = self.track[:, 2:4]
+		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)
+		self.s_path = np.insert(np.cumsum(self.el_lengths), 0, 0)
+		self.psi, self.kappa = tph.calc_head_curv_num.calc_head_curv_num(self.path, self.el_lengths, False)
+		self.normvectors = tph.calc_normal_vectors.calc_normal_vectors(self.psi)
 class Track:
-	def __init__(self, track, map_name):
+	def __init__(self, track , map_name):
 		self.path = track[:, :2]
 		self.widths = track[:, 2:4]
 		self.el_lengths = np.linalg.norm(np.diff(self.path, axis=0), axis=1)
@@ -46,7 +54,7 @@ def getS(map_name, path):
 	'''
 	centreLine = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv", delimiter=',', skiprows=1)
 	s=np.zeros(len(path))
-	for i, point in enumerate(path):
+	for i,point in enumerate(path):
 		_, _, t, index = nearest_point(point, centreLine)
 		s[i] = centreLine[index, 6] + t * np.linalg.norm(centreLine[index+1, :2] - centreLine[index, :2])
 	return s
@@ -85,56 +93,45 @@ def nearest_point(point, trajectory):
 	min_dist_segment = np.argmin(dists)
 	return projections[min_dist_segment], dists[min_dist_segment], t[min_dist_segment], min_dist_segment
 
-def generateMinCurvaturePath(track_path):
 
-	map_name = track_path.split('/')[-1].split('_')[0]
-	path_type = track_path.split('/')[-1].split('_')[-1].split('.')[0]
-	if path_type == 'centreline':
-		ref = f'{map_name}'
-	else:
-		temp = track_path.split('/')[-1].split('.')[0].split('_')[-1]
-		ref = f'{map_name}_{temp}'
-	print(f'Generating min curvature path for {map_name}')
-	racetrack_params = load_parameter_file("RaceTrackGenerator")
 
-	track = CentreLine(track_path)
-	reftrack = track.track
-	normvectors = track.normvec_normalized
-	A = track.A
-	spline_len = track.el_lengths
-	psi = track.psi
-	kappa = track.kappa
-	dkappa = track.dkappa
-	kappa_bound = racetrack_params["max_kappa"]
-	w_veh = racetrack_params["vehicle_width"]
-	print_debug = True
-	plot_debug = False
-	stepsize_interp = 0.3
-	iters_min = 5
-	curv_error_allowed = 0.01
-
-	alpha_mincurv_tmp, reftrack_tmp, normvectors_tmp, spline_len_tmp, psi_reftrack_tmp, kappa_reftrack_tmp, dkappa_reftrack_tmp = tph.iqp_handler.iqp_handler(reftrack, normvectors, A, spline_len, psi, kappa, dkappa, kappa_bound, w_veh, print_debug, plot_debug, stepsize_interp, iters_min, curv_error_allowed)
-	raceline, _,_,_, spline_inds, t_values = tph.create_raceline.create_raceline(reftrack_tmp[:, :2], normvectors_tmp, alpha_mincurv_tmp, racetrack_params["raceline_step"])[:6]
-	reftrack_tmp[:, 2] -= alpha_mincurv_tmp
-	reftrack_tmp[:, 3] += alpha_mincurv_tmp
-	new_widths = tph.interp_track_widths.interp_track_widths(reftrack_tmp[:, 2:4], spline_inds, t_values, incl_last_point=False)
-	reftrack_tmp = np.column_stack((raceline, new_widths))
-	reftrack_tmp = tph.interp_track.interp_track(reftrack_tmp, 0.1)
-	track_data = Track(reftrack_tmp, map_name)
-
-	map_name = track_path.split('/')[-1].split('_')[0]
-	path_type = track_path.split('/')[-1].split('_')[-1].split('.')[0]
-	if path_type == 'centreline':
-		ref = f'{map_name}'
-	else:
-		temp = track_path.split('/')[-1].split('.')[0].split('_')[-1]
-		ref = f'{map_name}_{temp}'
-
+def generateShortestPath(centreline_path):
+	'''
+	Generates the shortest path for the given centreline path
 	
-	save_path = f"/home/chris/sim_ws/src/global_planning/maps/{ref}_minCurve.csv"
-	with open(save_path, 'wb') as fh:
-		np.savetxt(fh, track_data.data_save, fmt='%0.16f', delimiter=',', header='x_m,y_m,w_tr_right_m,w_tr_left_m,psi,kappa,s,velocity,acceleration,time')
+	centreline_path: str, path to the centreline file (f"maps/{map_name}_centreline.csv")
+	'''
+	print(f'Generating shortest path for {centreline_path}')
+	racetrack_params = load_parameter_file("RaceTrackGenerator")
+	map_name = centreline_path.split('/')[-1].split('_')[0]
+	path_type = centreline_path.split('/')[-1].split('_')[-1].split('.')[0]
+	if path_type == 'centreline':
+		ref = f'{map_name}'
+	else:
+		temp = centreline_path.split('/')[-1].split('.')[0].split('_')[1:]
+		ref = f'{map_name}_{temp[-1]}'
+		print(ref)
+	
+	centreline = CentreLine(centreline_path)
 
+	widths = centreline.widths - racetrack_params["vehicle_width"] / 2
+	track = np.concatenate([centreline.path, widths], axis=1)
+	alpha = tph.opt_shortest_path.opt_shortest_path(track, centreline.normvectors, 0)
+	path, _, _, _, spline_inds_raceline_interp, t_values_raceline_interp, s_raceline, _, el_lengths_raceline_interp_cl = tph.create_raceline.create_raceline(centreline.path, centreline.normvectors, alpha, racetrack_params["raceline_step"])
+	centreline.widths[:, 0] -= alpha
+	centreline.widths[:, 1] += alpha
+	new_widths = tph.interp_track_widths.interp_track_widths(centreline.widths, spline_inds_raceline_interp, t_values_raceline_interp)
+	short_track = np.concatenate([path, new_widths], axis=1)
+	# short_track = run_smoothing_process(short_track)
+	# short_track = iqp(short_track)
+	short_track = tph.interp_track.interp_track(short_track, 0.1)
+	track = Track(short_track, map_name)
+	savedata = track.data_save
+
+	save_path = f"/home/chris/sim_ws/src/global_planning/maps/{ref}_short.csv"
+
+	with open(save_path, 'wb') as fh:
+		np.savetxt(fh, savedata, fmt='%0.16f', delimiter=',', header='x_m,y_m,w_tr_right_m,w_tr_left_m,psi,kappa,s,velocity,acceleration,time')
 
 
 
@@ -143,7 +140,9 @@ def main():
 	for file in os.listdir('maps/'):
 		if file.endswith('.png'):
 			map_name = file.split('.')[0]
-			generateMinCurvaturePath(f"maps/{map_name}_short.csv")
+			print(f"Extracting min curvature path for: {map_name}")
+			# generateMinCurvaturePath(centreline_path=f"maps/{map_name}_centreline.csv", opt_number=0)
+			generateShortestPath(centreline_path=f"maps/{map_name}_short.csv")
 
 
 

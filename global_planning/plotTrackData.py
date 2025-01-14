@@ -3,9 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import yaml
-from centerlineExtraction import getCentreLine
-from iqp import generateMinCurvaturePath
-from shortPath import generateShortestPath
+# from centerlineExtraction import getCentreLine
+from centerline import getCentreLine
+from minimumCurvature import generateMinCurvaturePath
+from shortestPath import generateShortestPath
 import scipy
 
 class Track:
@@ -24,22 +25,26 @@ class Track:
 	def __init__(self, map_name):
 
 		# Ensure the directory exists
-		output_dir = f"data"
+		output_dir = f"/home/chris/sim_ws/src/global_planning/data"
 		os.makedirs(output_dir, exist_ok=True)
+
+		# getCentreLine(map_name)
+		# generateShortestPath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
+		# generateMinCurvaturePath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short.csv")
 
 		if not os.path.exists(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv"):
 			getCentreLine(map_name)
+			generateShortestPath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
+			generateMinCurvaturePath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
+
 		if not os.path.exists(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short.csv"):
 			generateShortestPath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
-		if not os.path.exists(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short_minCurve.csv"):
-			generateMinCurvaturePath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short.csv")
-		# if not os.path.exists(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_minCurve.csv"):
-		# 	generateMinCurvaturePath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
+			generateMinCurvaturePath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
 
-		# getCentreLine(map_name)
-		# generateShortestPath(f"maps/{map_name}_centreline.csv")
-		# generateMinCurvaturePath(f"maps/{map_name}_centreline.csv")
-		# generateMinCurvaturePath(f"maps/{map_name}_short.csv")
+		if not os.path.exists(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_minCurve.csv"):
+			generateMinCurvaturePath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
+
+
 
 		map_yaml_path = f"/home/chris/sim_ws/src/global_planning/maps/{map_name}.yaml"
 		map_img = plt.imread(f'/home/chris/sim_ws/src/global_planning/maps/{map_name}.png')
@@ -47,7 +52,7 @@ class Track:
 		# smoothed_centreline = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/smooth_test/{map_name}_centerline.csv", delimiter=',')
 		short = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short.csv", delimiter=',')
 		# minCurve = np.loadtxt(f"maps/{map_name}_minCurve.csv", delimiter=',')
-		shortMinCurve = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short_minCurve.csv", delimiter=',')
+		shortMinCurve = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_minCurve.csv", delimiter=',')
 		# flip the image around x axis
 		map_img = np.flipud(map_img)
 		map_img = scipy.ndimage.distance_transform_edt(map_img)
@@ -83,7 +88,7 @@ class Track:
 		plt.plot(shortMinCurveX, shortMinCurveY, label=f'Minimum Curvature S({shortMinCurve[-1, -1]:.2f}s)')
 		# plt.plot(smoothed_centrelineX, smoothed_centrelineY, label='Smoothed Centreline')
 		plt.legend(loc='upper right')
-		# plt.savefig(f"{output_dir}/{map_name}_racelines.svg")
+		plt.savefig(f"{output_dir}/{map_name}_racelines.png")
 		plt.show()
 
 		plt.figure( num=f'{map_name}_curvature')
@@ -94,7 +99,7 @@ class Track:
 		plt.plot(shortMinCurveS, shortMinCurve[:, 5], label='Minimum Curvature')
 		# plt.plot(smoothed_centrelineS, smoothed_centreline[:, 5], label='Smoothed Centreline')
 		plt.legend(loc='upper right')
-		# plt.savefig(f"{output_dir}/{map_name}_curvature.svg")
+		plt.savefig(f"{output_dir}/{map_name}_curvature.png")
 		plt.show()
 
 		plt.figure( num=f'{map_name}_heading')
@@ -105,7 +110,7 @@ class Track:
 		plt.plot(shortMinCurveS, shortMinCurve[:, 4], label='Minimum Curvature')
 		# plt.plot(smoothed_centrelineS, smoothed_centreline[:, 4], label='Smoothed Centreline')
 		plt.legend(loc='upper right')
-		# plt.savefig(f"{output_dir}/{map_name}_heading.svg")
+		plt.savefig(f"{output_dir}/{map_name}_heading.png")
 		plt.show()
 
 		plt.figure( num=f'{map_name}_velocity')
@@ -116,7 +121,7 @@ class Track:
 		plt.plot(shortMinCurveS, shortMinCurve[:, 7], label='Minimum Curvature')
 		# plt.plot(smoothed_centrelineS, smoothed_centreline[:, 3], label='Smoothed Centreline')
 		plt.legend(loc='upper right')
-		# plt.savefig(f"{output_dir}/{map_name}_velocity.svg")
+		plt.savefig(f"{output_dir}/{map_name}_velocity.png")
 		plt.show()
 
 
