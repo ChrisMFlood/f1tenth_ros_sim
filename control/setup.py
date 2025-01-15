@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'pure_pursuit = control.pure_pursuit:main',
+            'pure_pursuit_c = control.pure_pursuit_c:main',
             'stanley = control.stanley:main',
             'follow_the_gap = control.follow_the_gap:main',
             'follow_the_gap_rl = control.follow_the_gap_rl:main',

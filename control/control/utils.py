@@ -1,6 +1,5 @@
 import numpy as np
 import math
-
 import rclpy
 from rclpy.node import Node, Publisher
 
@@ -24,6 +23,27 @@ def publishTrajectory(x,y,yaw, publisher: Publisher):
 		pose.orientation.z = qz
 		poseArray.poses.append(pose)
 	publisher.publish(poseArray)
+
+def publishPoint(x,y,publisher: Publisher):
+		marker = Marker()
+		marker.header.frame_id = "map"
+		marker.type = Marker.SPHERE
+		marker.action = Marker.ADD
+		marker.pose.position.x = x
+		marker.pose.position.y = y
+		marker.pose.position.z = 0.0
+		marker.pose.orientation.x = 0.0
+		marker.pose.orientation.y = 0.0
+		marker.pose.orientation.z = 0.0
+		marker.pose.orientation.w = 1.0
+		marker.scale.x = 0.1
+		marker.scale.y = 0.1
+		marker.scale.z = 0.1
+		marker.color.a = 1.0
+		marker.color.r = 0.0
+		marker.color.g = 1.0
+		marker.color.b = 0.0
+		publisher.publish(marker)
 
 def publishPose(x,y,yaw, publisher: Publisher):
 	pose = Pose()
@@ -74,42 +94,78 @@ def setInitialPosition(position_publisher: Publisher, drive_publisher: Publisher
 	position_publisher.publish(position)
 	print('Initial position set')
 
+# def nearest_point(point, trajectory):
+# 	"""
+# 	Return the nearest point along the given piecewise linear trajectory.
+
+# 	Args:
+# 		point (numpy.ndarray, (2, )): (x, y) of current pose
+# 		trajectory (numpy.ndarray, (N, 2)): array of (x, y) trajectory waypoints
+# 			NOTE: points in trajectory must be unique. If they are not unique, a divide by 0 error will destroy the world
+
+# 	Returns:
+# 		nearest_point (numpy.ndarray, (2, )): nearest point on the trajectory to the point
+# 		nearest_dist (float): distance to the nearest point
+# 		t (float): nearest point's location as a segment between 0 and 1 on the vector formed by the closest two points on the trajectory. (p_i---*-------p_i+1)
+# 		i (int): index of nearest point in the array of trajectory waypoints
+# 	"""
+# 	diffs = trajectory[1:,:] - trajectory[:-1,:]
+# 	l2s   = diffs[:,0]**2 + diffs[:,1]**2
+# 	dots = np.empty((trajectory.shape[0]-1, ))
+# 	for i in range(dots.shape[0]):
+# 		dots[i] = np.dot((point - trajectory[i, :]), diffs[i, :])
+# 	t = dots / l2s
+# 	t[t<0.0] = 0.0
+# 	t[t>1.0] = 1.0
+# 	projections = trajectory[:-1,:] + (t*diffs.T).T
+# 	dists = np.empty((projections.shape[0],))
+# 	for i in range(dists.shape[0]):
+# 		temp = point - projections[i]
+# 		dists[i] = np.sqrt(np.sum(temp*temp))
+# 	min_dist_segment = np.argmin(dists)
+# 	return projections[min_dist_segment], dists[min_dist_segment], t[min_dist_segment], min_dist_segment
+
 def nearest_point(point, trajectory):
-	"""
-	Return the nearest point along the given piecewise linear trajectory.
+    """
+    Return the nearest point along the given piecewise linear trajectory.
 
-	Args:
-		point (numpy.ndarray, (2, )): (x, y) of current pose
-		trajectory (numpy.ndarray, (N, 2)): array of (x, y) trajectory waypoints
-			NOTE: points in trajectory must be unique. If they are not unique, a divide by 0 error will destroy the world
+    Args:
+        point (numpy.ndarray, (2, )): (x, y) of current pose
+        trajectory (numpy.ndarray, (N, 2)): array of (x, y) trajectory waypoints
+            NOTE: points in trajectory must be unique. If they are not unique, a divide by 0 error will destroy the world
 
-	Returns:
-		nearest_point (numpy.ndarray, (2, )): nearest point on the trajectory to the point
-		nearest_dist (float): distance to the nearest point
-		t (float): nearest point's location as a segment between 0 and 1 on the vector formed by the closest two points on the trajectory. (p_i---*-------p_i+1)
-		i (int): index of nearest point in the array of trajectory waypoints
-	"""
-	diffs = trajectory[1:,:] - trajectory[:-1,:]
-	l2s   = diffs[:,0]**2 + diffs[:,1]**2
-	dots = np.empty((trajectory.shape[0]-1, ))
-	for i in range(dots.shape[0]):
-		dots[i] = np.dot((point - trajectory[i, :]), diffs[i, :])
-	t = dots / l2s
-	t[t<0.0] = 0.0
-	t[t>1.0] = 1.0
-	projections = trajectory[:-1,:] + (t*diffs.T).T
-	dists = np.empty((projections.shape[0],))
-	for i in range(dists.shape[0]):
-		temp = point - projections[i]
-		dists[i] = np.sqrt(np.sum(temp*temp))
-	min_dist_segment = np.argmin(dists)
-	return projections[min_dist_segment], dists[min_dist_segment], t[min_dist_segment], min_dist_segment
+    Returns:
+        nearest_point (numpy.ndarray, (2, )): nearest point on the trajectory to the point
+        nearest_dist (float): distance to the nearest point
+        t (float): nearest point's location as a segment between 0 and 1 on the vector formed by the closest two points on the trajectory. (p_i---*-------p_i+1)
+        i (int): index of nearest point in the array of trajectory waypoints
+    """
+    diffs = trajectory[1:] - trajectory[:-1]
+    l2s = np.sum(diffs**2, axis=1)
+    dots = np.einsum('ij,ij->i', point - trajectory[:-1], diffs)
+    t = np.clip(dots / l2s, 0.0, 1.0)
+    projections = trajectory[:-1] + t[:, np.newaxis] * diffs
+    dists = np.linalg.norm(point - projections, axis=1)
+    min_dist_segment = np.argmin(dists)
+    return projections[min_dist_segment], dists[min_dist_segment], t[min_dist_segment], min_dist_segment
+
+MIN_STEERING_ANGLE = -0.4
+MAX_STEERING_ANGLE = 0.4
 
 def pubishActuation(steering_angle, speed, cmd_publisher: Publisher):
+	steering_angle = np.clip(steering_angle, MIN_STEERING_ANGLE, MAX_STEERING_ANGLE)
+
 	cmd = AckermannDriveStamped()
 	cmd.drive.steering_angle = steering_angle
 	cmd.drive.speed = speed
 	cmd_publisher.publish(cmd)
+
+def normaliseAngle(angle):
+	if angle > np.pi:
+			angle = angle - 2*np.pi
+	if angle < -np.pi:
+			angle = angle + 2*np.pi
+	return angle
 
 
 # def getLapProgress(waypoints, pose, lapDistance, lapCount, current_time, speed, saveData, saveDataIndex, map_name):

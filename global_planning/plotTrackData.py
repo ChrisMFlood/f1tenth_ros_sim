@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import yaml
-# from centerlineExtraction import getCentreLine
 from centerline import getCentreLine
 from minimumCurvature import generateMinCurvaturePath
 from shortestPath import generateShortestPath
@@ -15,7 +14,6 @@ class Track:
 		- centreline: maps/{map_name}_centreline.csv
 		- shortest path: maps/{map_name}_short.csv
 		- minimum curvature path: maps/{map_name}_minCurve.csv
-		- minimum curvature path based on shortest path: maps/{map_name}_short_minCurve.csv
 
 		Plots:
 		- all paths

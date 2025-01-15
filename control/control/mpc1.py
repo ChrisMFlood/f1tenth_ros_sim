@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import cvxpy.cvxcore
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
@@ -9,6 +10,9 @@ from visualization_msgs.msg import MarkerArray
 from ackermann_msgs.msg import AckermannDriveStamped
 import math
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, Pose
+from nav_msgs.srv import GetMap
+import range_libc
+
 import cvxpy
 # from scipy.linalg import block_diag
 from sympy import pprint
@@ -18,6 +22,7 @@ from scipy.linalg import block_diag
 from scipy.sparse import block_diag
 from scipy.sparse import csc_matrix
 from dataclasses import dataclass, field
+import time
 
 @dataclass
 class State:
@@ -44,9 +49,9 @@ class myNode(Node):
 		self.declare_parameter("dt", 0.1)
 		self.declare_parameter("time_step_horizon", 5)
 		self.declare_parameter("wheel_base", 0.33)
-		self.declare_parameter("MAX_SPEED", 9.0)
+		self.declare_parameter("MAX_SPEED", 8.0)
 		self.declare_parameter("MIN_SPEED", 0.0)
-		self.declare_parameter("MAX_ACCEL", 10)
+		self.declare_parameter("MAX_ACCEL", 10.0)
 		self.declare_parameter("MAX_STEER", 0.41)
 		self.declare_parameter("MIN_STEER", -0.41)
 		self.declare_parameter("MAX_DSTEER", np.pi)
@@ -63,9 +68,9 @@ class myNode(Node):
 		self.MAX_STEER = self.get_parameter("MAX_STEER").value
 		self.MIN_STEER = self.get_parameter("MIN_STEER").value
 
-		self.declare_parameter("NX",4)
+		self.declare_parameter("NX",5)
 		self.NX = self.get_parameter("NX").value
-		'''X = [x, y, v, yaw]'''
+		'''X = [x, y, v, yaw, delta]'''
 		self.declare_parameter("NU",2)
 		self.NU = self.get_parameter("NU").value
 		'''U = [acceleration, steering speed,]'''
@@ -78,6 +83,7 @@ class myNode(Node):
 		# Subscribers
 		self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
 
+
 		# Load waypoints
 		self.waypoints = np.loadtxt(f'src/global_planning/maps/{self.map_name}_minCurve.csv', delimiter=',', skiprows=1)
 		'''[x_m,y_m,w_tr_right_m,w_tr_left_m,psi,kappa,s,velocity,acceleration,time]'''
@@ -89,37 +95,66 @@ class myNode(Node):
 		self.oa = None
 		self.odelta_v = None
 
-		self.Rk = np.diag([0.01, 100])  # input cost matrix
+		self.Rk = np.diag([0.01, 0.01])  # input cost matrix
 		self.Rdk = np.diag([0.01, 0.01])  # input difference cost matrix
-		self.Qk = np.diag([13.5, 13.5, 13.5, 13.0])  # state cost matrix
-		self.Qfk = np.diag([13.5, 13.5, 7.5, 13.0])  # state final cost matrix
+		self.Qk = np.diag([15, 15, 7.7, 13, 0])  # state cost matrix
+		self.Qfk = np.diag([13.5, 13.5, 7.5, 13.0, 0])  # state final cost matrix
+
+		# self.Rk = np.diag([0.01, 1/0.5])  # input cost matrix
+		# self.Rdk = np.diag([0.01, 10/np.pi])  # input difference cost matrix
+		# self.Qk = np.diag([1/0.01, 1/0.01, 1/0.01, 0, 0])  # state cost matrix
+		# self.Qfk = np.diag([1/0.01, 1/0.01, 1/0.01, 0, 0])  # state final cost matrix
+
+		# self.Rk = np.diag([0, 0])  # input cost matrix
+		# self.Rdk = np.diag([0, 0])  # input difference cost matrix
+		# self.Qk = np.diag([13.5, 13.5, 13.5, 13.0, 0])  # state cost matrix
+		# self.Qfk = np.diag([13.5, 13.5, 7.5, 13.0, 0])  # state final cost matrix
+
+		self.lapCount=0
+		self.lapProgress=0
+		self.prevDistance=0
+		self.saveData = np.zeros((500000, 6))
+		self.saveDataIndex = 0
+		self.lapDistance = self.waypoints[-1, 6]
+		self.start = True
+		self.nSaved = True
+
+
 
 		# Init MPC
 		self.init_mpc()
 
 	def odom_callback(self, msg: Odometry):
-		self.odom = msg
-		self.state.x = msg.pose.pose.position.x
-		self.state.y = msg.pose.pose.position.y
-		self.state.v = msg.twist.twist.linear.x
-		self.state.yaw = self.euler_from_quaternion(msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
-		self.state.yaw_rate = msg.twist.twist.angular.z
+		if self.start:
+			self.start_time = time.time()
+			self.start = False
+		else:
+			self.current_time = time.time() - self.start_time
+			self.odom = msg
+			self.state.x = msg.pose.pose.position.x
+			self.state.y = msg.pose.pose.position.y
+			self.state.v = msg.twist.twist.linear.x
+			self.state.yaw = self.euler_from_quaternion(msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w)
+			self.state.yaw_rate = msg.twist.twist.angular.z
 
-		self.ref_traj = self.calc_ref_trajectory(self.state, self.waypoints[:,0], self.waypoints[:,1], self.waypoints[:,4], self.waypoints[:,7])
-		# self.publishTrajectory(self.ref_traj[0,:], self.ref_traj[1,:], self.ref_traj[3,:], self.ref_traj_pub)
+			self.ref_traj = self.calc_ref_trajectory(self.state, self.waypoints[:,0], self.waypoints[:,1], self.waypoints[:,4], self.waypoints[:,7])
+			# self.publishTrajectory(self.ref_traj[0,:], self.ref_traj[1,:], self.ref_traj[3,:], self.ref_traj_pub)
 
-		x0 = np.array([self.state.x, self.state.y, self.state.v, self.state.yaw])
-		# Solve the Linear MPC Control problem
-		self.oa,self.odelta_v,ox,oy,oyaw,ov,state_predict = self.linear_mpc_control_kinematic(self.ref_traj, x0, self.oa, self.odelta_v)
-		# self.publishTrajectory(ox,oy,oyaw,self.calc_ref_traj_pub)
+			x0 = np.array([self.state.x, self.state.y, self.state.v, self.state.yaw, self.state.delta])
+			# Solve the Linear MPC Control problem
+			self.oa,self.odelta_v,ox,oy,oyaw,ov,odelta,state_predict = self.linear_mpc_control_kinematic(self.ref_traj, x0, self.oa, self.odelta_v)
+			self.publishTrajectory(ox,oy,oyaw,self.calc_ref_traj_pub)
 
-
-		cmd = AckermannDriveStamped()
-		cmd.header.stamp = self.get_clock().now().to_msg()
-		cmd.header.frame_id = 'map'
-		cmd.drive.steering_angle = self.odelta_v[0]
-		cmd.drive.speed = self.oa[0]*self.dt + self.state.v
-		self.cmd_pub.publish(cmd)
+			self.state.delta = self.odelta_v[0]*self.dt + self.state.delta
+			cmd = AckermannDriveStamped()
+			cmd.header.stamp = self.get_clock().now().to_msg()
+			cmd.header.frame_id = 'map'
+			cmd.drive.steering_angle = self.state.delta
+			cmd.drive.speed = self.oa[0]*self.dt + self.state.v
+			# cmd.drive.steering_angle = odelta[1]
+			# cmd.drive.speed = ov[1]
+			self.cmd_pub.publish(cmd)
+			self.getLapProgress()
 
 	def linear_mpc_control_kinematic(self, ref_path, x0, oa, od):
 		"""
@@ -140,21 +175,23 @@ class myNode(Node):
 		poa, pod = oa[:], od[:]
 
 		# Run the MPC optimization: Create and solve the optimization problem
-		mpc_a, mpc_delta, mpc_x, mpc_y, mpc_yaw, mpc_v = self.mpc_prob_solve_kinematic(
+		mpc_a, mpc_Ddelta, mpc_x, mpc_y, mpc_yaw, mpc_v, mpc_delta = self.mpc_prob_solve_kinematic(
 			ref_path, path_predict, x0
 		)
 
-		return mpc_a, mpc_delta, mpc_x, mpc_y, mpc_yaw, mpc_v, path_predict
+		return mpc_a, mpc_Ddelta, mpc_x, mpc_y, mpc_yaw, mpc_v, mpc_delta, path_predict
 	
 	def mpc_prob_solve_kinematic(self, ref_traj, path_predict, x0):
 		self.x0k.value = x0
+
+
 
 		A_block = []
 		B_block = []
 		C_block = []
 		for t in range(self.step_horizon):
 			A, B, C = self.get_kinematic_model_matrix(
-				path_predict[2, t], path_predict[3, t], 0.0
+				path_predict[2, t], path_predict[3, t], path_predict[4, t]
 			)
 			A_block.append(A)
 			B_block.append(B)
@@ -172,6 +209,25 @@ class myNode(Node):
 
 		# Solve the optimization problem in CVXPY
 		# Solver selections: cvxpy.OSQP; cvxpy.GUROBI
+		# print(self.MPC_prob.param_dict['param28'].value)
+		# print(self.MPC_prob.constraints[-1].dual_value)
+		# paramdict = self.MPC_prob.parameters()
+		# vardict = self.MPC_prob.var_dict
+		# print(vardict['var1'].value)
+		# x= vardict['var1'].value
+		# xr = paramdict[0].value	
+		# print(xr)
+		# print(x)
+		# if x is not None:
+		# 	ABx = xr[0,1:] - xr[0,:-1]
+		# 	ABy = xr[1,1:] - xr[1,:-1]
+
+		# 	APx = x[0,:-1] - xr[0,:-1]
+		# 	APy = x[1,:-1] - xr[1,:-1]
+
+		# 	n = (APx * ABy - APy * ABx) / cvxpy.sqrt(ABx**2 + ABy**2)
+			# print('n= ', n)
+
 		self.MPC_prob.solve(solver=cvxpy.OSQP, verbose=False, warm_start=True)
 
 		if (
@@ -182,14 +238,15 @@ class myNode(Node):
 			oy = self.get_nparray_from_matrix(self.xk.value[1, :])
 			ov = self.get_nparray_from_matrix(self.xk.value[2, :])
 			oyaw = self.get_nparray_from_matrix(self.xk.value[3, :])
+			odelta = self.get_nparray_from_matrix(self.xk.value[4, :])
 			oa = self.get_nparray_from_matrix(self.uk.value[0, :])
-			odelta = self.get_nparray_from_matrix(self.uk.value[1, :])
+			oDdelta = self.get_nparray_from_matrix(self.uk.value[1, :])
 
 		else:
 			print("Error: Cannot solve mpc..")
-			oa, odelta, ox, oy, oyaw, ov = None, None, None, None, None, None
+			oa, oDdelta, odelta, ox, oy, oyaw, ov = None, None, None, None, None, None, None
 
-		return oa, odelta, ox, oy, oyaw, ov
+		return oa, oDdelta, ox, oy, oyaw, ov, odelta
 	
 	def get_nparray_from_matrix(self, x):
 		return np.array(x).flatten()
@@ -204,6 +261,7 @@ class myNode(Node):
 		state.y = x0[1]
 		state.v = x0[2]
 		state.yaw = x0[3]
+		state.delta = x0[4]
 		
 		for (ai, di, i) in zip(oa, od, range(1, self.step_horizon + 1)):
 			state: State = self.update_state_kinematic(state, ai, di)
@@ -211,28 +269,35 @@ class myNode(Node):
 			path_predict[1, i] = state.y
 			path_predict[2, i] = state.v
 			path_predict[3, i] = state.yaw
+			path_predict[4, i] = state.delta
 
 		return path_predict
 	
-	def update_state_kinematic(self, state: State, a, delta):
+	def update_state_kinematic(self, state: State, a, Ddelta):
 
 		# input check
-		if delta >= self.MAX_STEER:
-			delta = self.MAX_STEER
-		elif delta <= -self.MAX_STEER:
-			delta = -self.MAX_STEER
+		# if Ddelta >= self.MAX_STEER:
+		# 	Ddelta = self.MAX_STEER
+		# elif Ddelta <= -self.MAX_STEER:
+		# 	Ddelta = -self.MAX_STEER
 
 		state.x = state.x + state.v * math.cos(state.yaw) * self.dt
 		state.y = state.y + state.v * math.sin(state.yaw) * self.dt
 		state.yaw = (
-			state.yaw + (state.v / self.WB) * math.tan(delta) * self.dt
+			state.yaw + (state.v / self.WB) * math.tan(state.delta) * self.dt
 		)
 		state.v = state.v + a * self.dt
+		state.delta = state.delta + Ddelta * self.dt
 
 		if state.v > self.MAX_SPEED:
 			state.v = self.MAX_SPEED
 		elif state.v < self.MIN_SPEED:
 			state.v = self.MIN_SPEED
+
+		if state.delta > self.MAX_STEER:
+			state.delta = self.MAX_STEER
+		elif state.delta < -self.MAX_STEER:
+			state.delta = -self.MAX_STEER
 
 		return state
 		
@@ -343,14 +408,20 @@ class myNode(Node):
 
 		# Add dynamics constraints to the optimization problem
 		constraints += [cvxpy.vec(self.xk[:, 1:]) == self.Ak_ @ cvxpy.vec(self.xk[:, :-1]) + self.Bk_ @ cvxpy.vec(self.uk) + (self.Ck_)]
-		constraints += [cvxpy.abs(cvxpy.diff(self.uk[1, :])) <= self.MAX_DSTEER * self.dt]
+		constraints += [cvxpy.abs(cvxpy.diff(self.uk[1, :])) <= self.MAX_DSTEER]
 
 		# Create the constraints (upper and lower bounds of states and inputs) for the optimization problem
 		constraints += [self.xk[:, 0] == self.x0k]
 		constraints += [self.xk[2, :] <= self.MAX_SPEED]
 		constraints += [self.xk[2, :] >= self.MIN_SPEED]
+		constraints += [cvxpy.abs(self.xk[4, :]) <= self.MAX_STEER]
 		constraints += [cvxpy.abs(self.uk[0, :]) <= self.MAX_ACCEL]
 		constraints += [cvxpy.abs(self.uk[1, :]) <= self.MAX_STEER]
+
+
+
+
+
 
 		# Create the optimization problem in CVXPY and setup the workspace
 		# Optimization goal: minimize the objective function
@@ -374,16 +445,21 @@ class myNode(Node):
 		A[1, 1] = 1.0
 		A[2, 2] = 1.0
 		A[3, 3] = 1.0
+		A[4, 4] = 1.0
 		A[0, 2] = self.dt * math.cos(phi)
 		A[0, 3] = -self.dt * v * math.sin(phi)
 		A[1, 2] = self.dt * math.sin(phi)
 		A[1, 3] = self.dt * v * math.cos(phi)
 		A[3, 2] = self.dt * math.tan(delta) / self.WB
+		A[3, 4] = self.dt * v / (self.WB * math.cos(delta) ** 2)
+
+		
+
 
 		# Input Matrix B; 4x2
 		B = np.zeros((self.NX, self.NU))
 		B[2, 0] = self.dt
-		B[3, 1] = self.dt * v / (self.WB * math.cos(delta) ** 2)
+		B[4, 1] = self.dt
 
 		C = np.zeros(self.NX)
 		C[0] = self.dt * v * math.sin(phi) * phi
@@ -418,10 +494,11 @@ class myNode(Node):
 		ref_traj[2, 0] = sp[ind]
 		ref_traj[3, 0] = cyaw[ind]
 
+
 		# based on current velocity, distance traveled on the ref line between time steps
 		travel = abs(state.v) * self.dt
-		# dind = np.max([travel / self.waypointStepSize,1])
-		dind = int(travel / self.waypointStepSize)
+		dind = np.max([travel / self.waypointStepSize,1])
+		# dind = int(travel / self.waypointStepSize)
 		# dind = 2
 		ind_list = int(ind) + np.insert(
 			np.cumsum(np.repeat(dind, self.step_horizon)), 0, 0
@@ -544,6 +621,38 @@ class myNode(Node):
 		t4 = +1.0 - 2.0 * (y * y + z * z)
 		yaw_z = math.atan2(t3, t4)
 		return yaw_z # in radians
+	
+	
+	
+	def getLapProgress(self):
+		pose = np.array([self.state.x, self.state.y, self.state.yaw])
+		distance = np.linalg.norm(self.waypoints[:, :2] - pose[:2], axis=1)
+		closest_index = np.argmin(distance)
+		self.closestPointOnPath = self.waypoints[closest_index]
+		self.distance = self.closestPointOnPath[6]
+		self.lapProgress = self.distance/self.lapDistance*100
+		LP = self.lapProgress +100*self.lapCount
+		self.get_logger().info(f'Lap progress: {(self.lapProgress+self.lapCount*100):.2f}%')
+
+		if (int(self.lapProgress) == 100) and (int(self.prevDistance) != 100):
+			self.lapCount += 1
+			self.get_logger().info(f'Lap {self.lapCount} completed')
+
+		self.prevDistance = self.lapProgress
+
+		if LP <= 200:
+			temp = np.array([self.current_time, pose[0], pose[1], pose[2], self.state.v, int(LP/100)])
+			self.saveData[self.saveDataIndex] = temp
+			self.saveDataIndex += 1
+
+		if LP > 200:
+			if self.nSaved:
+				self.saveData = self.saveData[:self.saveDataIndex]
+				dataPath = f'/home/chris/sim_ws/src/control/Results/Data/{self.map_name}_mpc_x5.csv'
+				with open(dataPath, 'wb') as fh:
+					np.savetxt(fh, self.saveData, fmt='%0.16f', delimiter=',', header='time,x,y,yaw,speed,lap')
+				self.get_logger().info('Data saved')
+				self.nSaved = False
   
 def main(args=None):
 	rclpy.init(args=args)
