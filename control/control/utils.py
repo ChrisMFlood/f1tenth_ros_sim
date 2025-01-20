@@ -8,21 +8,24 @@ from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import PoseArray, Pose, Quaternion, PoseWithCovarianceStamped
 from ackermann_msgs.msg import AckermannDriveStamped
 
+
+
 def publishTrajectory(x,y,yaw, publisher: Publisher):
-	poseArray = PoseArray()
-	poseArray.header.frame_id = 'map'
-	poseArray.poses = []
-	for i in range(x.shape[0]):
-		pose = Pose()
-		pose.position.x = x[i]
-		pose.position.y = y[i]
-		qw,qx,qy,qz = quaternion_from_euler(0,0,yaw[i])
-		pose.orientation.w = qw
-		pose.orientation.x = qx
-		pose.orientation.y = qy
-		pose.orientation.z = qz
-		poseArray.poses.append(pose)
-	publisher.publish(poseArray)
+	if publisher.get_subscription_count() >= 1:
+		poseArray = PoseArray()
+		poseArray.header.frame_id = 'map'
+		poseArray.poses = []
+		for i in range(x.shape[0]):
+			pose = Pose()
+			pose.position.x = x[i]
+			pose.position.y = y[i]
+			qw,qx,qy,qz = quaternion_from_euler(0,0,yaw[i])
+			pose.orientation.w = qw
+			pose.orientation.x = qx
+			pose.orientation.y = qy
+			pose.orientation.z = qz
+			poseArray.poses.append(pose)
+		publisher.publish(poseArray)
 
 def publishPoint(x,y,publisher: Publisher):
 		marker = Marker()

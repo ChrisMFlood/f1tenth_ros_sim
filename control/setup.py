@@ -25,6 +25,8 @@ setup(
             'stanley = control.stanley:main',
             'follow_the_gap = control.follow_the_gap:main',
             'follow_the_gap_rl = control.follow_the_gap_rl:main',
+            'mpc_dynamic = control.mpc_dynamic:main',
+            'mpc_kinematic = control.mpc_kinematic:main',
             'mpc = control.mpc:main',
             'mpc2 = control.mpc_template:main',
             'mpc3 = control.mpc_tmp:main',
