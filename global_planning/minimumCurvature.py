@@ -27,7 +27,7 @@ def generateMinCurvaturePath(refline_path):
 	print_debug = True
 	plot_debug = False
 	stepsize_interp = racetrack_params["raceline_step"]
-	iters_min = 5
+	iters_min = 15
 	curv_error_allowed = 0.01
 
 	alpha_mincurv_tmp, reftrack_tmp, normvectors_tmp, spline_len_tmp, psi_reftrack_tmp, kappa_reftrack_tmp, dkappa_reftrack_tmp = tph.iqp_handler.iqp_handler(reftrack, normvectors, A, spline_len, psi, kappa, dkappa, kappa_bound, w_veh, print_debug, plot_debug, stepsize_interp, iters_min, curv_error_allowed)

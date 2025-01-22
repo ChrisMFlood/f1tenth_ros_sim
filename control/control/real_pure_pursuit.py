@@ -8,13 +8,13 @@ from visualization_msgs.msg import Marker
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PoseArray
 from control import utils as utils
+from sensor_msgs.msg import Joy
   
 class myNode(Node):
 	def __init__(self):
 		super().__init__("pure_pursuit")
 		# Parameters
-		# self.declare_parameter("odom_topic","/pf/pose/odom")
-		self.declare_parameter("odom_topic","/ego_racecar/odom")
+		self.declare_parameter("odom_topic","/pf/pose/odom")
 		self.odom_topic = self.get_parameter("odom_topic").value
 
 		self.declare_parameter("lookahead_distance", 1)
@@ -39,6 +39,7 @@ class myNode(Node):
 
 		# Subscribers
 		self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+		self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, 10)
 		# Publishers
 		self.cmd_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
 		self.target_pub = self.create_publisher(Marker, "target", 10)
@@ -50,7 +51,10 @@ class myNode(Node):
 		self.waypoints = np.loadtxt(f'src/global_planning/maps/{self.map_name}_minCurve.csv', delimiter=',', skiprows=1)
 		utils.publishTrajectory(self.waypoints[:,0], self.waypoints[:,1], self.waypoints[:,4], self.waypoints_pub)
 
-		# Variables 
+		# Variables
+		self.joy = None
+	def joy_callback(self, msg: Joy):
+		self.joy = msg.buttons[7]
 
 		
 
@@ -68,7 +72,8 @@ class myNode(Node):
 		utils.publishPoint(self.targetPoint[0],self.targetPoint[1],self.target_pub)
 		self.steeringAngle, self.velocity = self.actuation()
 		print(self.steeringAngle, self.velocity)
-		utils.pubishActuation(self.steeringAngle, self.velocity, self.cmd_pub)
+		if self.joy:
+			utils.pubishActuation(self.steeringAngle, self.velocity, self.cmd_pub)
 		
 	
 	def getLookAheadDistance(self, speed):

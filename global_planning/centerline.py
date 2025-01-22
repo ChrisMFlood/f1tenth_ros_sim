@@ -69,6 +69,9 @@ def getCentreLine(map_name):
 	# 	THRESHOLD = 0.50
 	# centers = dist_transform > THRESHOLD*dist_transform.max()
 	centers = dist_transform > THRESHOLD
+	if map_name == 'map3' or map_name == 'fourthfloor':
+		THRESHOLD = 0.6
+		centers = dist_transform > THRESHOLD*dist_transform.max()
 	# print(centers)
 	# plt.imshow(map_img, origin='lower', cmap='gray')
 	# plt.imshow(centers, origin='lower', cmap='gray')
@@ -98,9 +101,9 @@ def getCentreLine(map_name):
 	visited = {}
 	centerline_points = []
 	track_widths = []
-	DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+	# DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
 	# If you want the other direction first
-	# DIRECTIONS = [(0, -1), (-1, 0),  (0, 1), (1, 0), (-1, 1), (-1, -1), (1, 1), (1, -1) ]
+	DIRECTIONS = [(0, -1), (-1, 0),  (0, 1), (1, 0), (-1, 1), (-1, -1), (1, 1), (1, -1) ]
 
 	def dfs(point):
 		if (point in visited): return
@@ -110,6 +113,7 @@ def getCentreLine(map_name):
 		for direction in DIRECTIONS:
 			if (centerline_dist[point[1] + direction[1]][point[0] + direction[0]] != NON_EDGE and (point[0] + direction[0], point[1] + direction[1]) not in visited):
 				dfs((point[0] + direction[0], point[1] + direction[1]))
+				return
 
 	dfs(starting_point)
 

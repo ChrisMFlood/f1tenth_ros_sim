@@ -1,22 +1,16 @@
 #!/usr/bin/env python3
 import math
 import numpy as np
-from dataclasses import dataclass, field
 import cvxpy
 from scipy.linalg import block_diag
-from scipy.sparse import block_diag, csc_matrix, diags
-from scipy.spatial import transform
-import os
+from scipy.sparse import block_diag, csc_matrix
 
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
-from ackermann_msgs.msg import AckermannDrive, AckermannDriveStamped
-from geometry_msgs.msg import Point, PoseStamped
-from sensor_msgs.msg import LaserScan
-from visualization_msgs.msg import Marker, MarkerArray
+from ackermann_msgs.msg import AckermannDriveStamped
 from control import utils as utils
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseArray, Pose
+from geometry_msgs.msg import PoseArray
 
 class State:
 	x: float = 0.0

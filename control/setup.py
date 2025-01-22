@@ -30,6 +30,7 @@ setup(
             'mpc = control.mpc:main',
             'mpc2 = control.mpc_template:main',
             'mpc3 = control.mpc_tmp:main',
+            'wall_follow = control.wall_follow_node:main',
         ],
     },
 )

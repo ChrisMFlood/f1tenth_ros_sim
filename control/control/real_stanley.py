@@ -7,6 +7,7 @@ from ackermann_msgs.msg import AckermannDriveStamped
 import math
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from geometry_msgs.msg import PoseArray
+from sensor_msgs.msg import Joy
 from control import utils as utils
 
 class myNode(Node):
@@ -14,8 +15,7 @@ class myNode(Node):
 		super().__init__("stanley") 
 		self.get_logger().info('Stanley controller started')
 		# Parameters
-		self.declare_parameter("odom_topic","/ego_racecar/odom")
-		# self.declare_parameter("odom_topic","/pf/pose/odom")
+		self.declare_parameter("odom_topic","/pf/pose/odom")
 		self.odom_topic = self.get_parameter("odom_topic").value
 		self.declare_parameter("ke", 10)
 		self.declare_parameter("kv", 10)
@@ -35,6 +35,7 @@ class myNode(Node):
 
 		# Subscribers
 		self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
+		self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, 10)
 		# Publishers
 		self.cmd_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
 		self.waypoints_pub = self.create_publisher(PoseArray, '/waypoints', 10)
@@ -51,7 +52,9 @@ class myNode(Node):
 
 		# Variables  
 
-
+		self.joy = None
+	def joy_callback(self, msg: Joy):
+		self.joy = msg.buttons[7]
 
 	def odom_callback(self, msg: Odometry):
 		self.odom = msg
@@ -65,7 +68,8 @@ class myNode(Node):
 		
 		self.steeringAngle, self.velocity = self.actuation()
 		# print(self.steeringAngle, self.velocity)
-		utils.pubishActuation(self.steeringAngle, self.velocity, self.cmd_pub)
+		if self.joy:
+			utils.pubishActuation(self.steeringAngle, self.velocity, self.cmd_pub)
 
 	def getCrossTrackError(self):
 		x = self.pose[0] + np.cos(self.pose[2])*self.wheel_base
