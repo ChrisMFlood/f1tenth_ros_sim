@@ -18,7 +18,7 @@ class trajectroy:
 		self.psi, self.kappa = tph.calc_head_curv_num.calc_head_curv_num(np.column_stack((self.path[:,1],self.path[:,0])), self.el_lengths, False)
 		self.normvectors = tph.calc_normal_vectors.calc_normal_vectors(self.psi)
 		self.v, self.a, self.t = generateVelocityProfile(np.column_stack((self.path, self.widths)))
-		self.data_save = np.column_stack((self.path, self.widths, -self.psi, self.kappa, self.s_path, self.v, self.a, self.t))
+		self.data_save = np.column_stack((self.path, self.widths, -self.psi, -self.kappa, self.s_path, self.v, self.a, self.t))
 
 class Trajectroy:
 	def __init__(self, track, map_name):
@@ -30,7 +30,7 @@ class Trajectroy:
 		self.psi, self.kappa = tph.calc_head_curv_num.calc_head_curv_num(np.column_stack((self.path[:,1],self.path[:,0])), self.el_lengths, False)
 		self.normvectors = tph.calc_normal_vectors.calc_normal_vectors(self.psi)
 		self.v, self.a, self.t = generateVelocityProfile(np.column_stack((self.path, self.widths)))
-		self.data_save = np.column_stack((self.path, self.widths, -self.psi, self.kappa, self.s_path, self.v, self.a, self.t))
+		self.data_save = np.column_stack((self.path, self.widths, -self.psi, -self.kappa, self.s_path, self.v, self.a, self.t))
 
 class Trajectory_an:
 	def __init__(self, track):

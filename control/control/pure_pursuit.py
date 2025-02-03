@@ -21,11 +21,11 @@ class myNode(Node):
 		self.declare_parameter("k", 0.5)
 		self.declare_parameter("wheel_base", 0.33)
 		self.declare_parameter("min_speed", 0.1)
-		self.declare_parameter('max_speed', 8.0)
+		self.declare_parameter('max_speed', 3.0)
 		self.declare_parameter("max_steering_angle", 0.4)
-		self.declare_parameter("map_name", "esp")
-		self.declare_parameter('constant_lookahead_distance',1.0)
-		self.declare_parameter('variable_lookahead_distance',1.0)
+		self.declare_parameter("map_name", "map3")
+		self.declare_parameter('constant_lookahead_distance',0.7)
+		self.declare_parameter('variable_lookahead_distance',0.3)
 
 		self.lookahead_distance = self.get_parameter("lookahead_distance").value
 		self.k = self.get_parameter("k").value
@@ -63,18 +63,16 @@ class myNode(Node):
 
 		self.closestPoint, self.nearestDistance, self.t1, self.nearestIndex = utils.nearest_point(self.pose[0:2], self.waypoints[:,0:2])
 		self.lookAheadDistance = self.getLookAheadDistance(self.speed)
-		# self.lookAheadDistance = self.getLookAheadDistance(self.waypoints[self.nearestIndex,7] + (self.waypoints[self.nearestIndex+1,7] - self.waypoints[self.nearestIndex,7])*self.t1)
 		self.targetPoint, self.targetIndex, self.t2 = self.getTargetWaypoint()
 		utils.publishPoint(self.targetPoint[0],self.targetPoint[1],self.target_pub)
 		self.steeringAngle, self.velocity = self.actuation()
-		print(self.steeringAngle, self.velocity)
-		utils.pubishActuation(self.steeringAngle, self.velocity, self.cmd_pub)
+		utils.pubishActuation(self.steeringAngle, self.velocity, self.cmd_pub, self.max_speed)
 		
 	
 	def getLookAheadDistance(self, speed):
 		# Speed
-		if speed < 0.1:
-			speed = 0.1
+		# if speed < 0.1:
+		# 	speed = 0.1
 		lookAheadDistance = self.constant_lookahead + (speed/self.max_speed)*self.variable_lookahead
 		# Curvature
 		# lookAheadDistance = self.constant_lookahead + self.k/np.abs(self.waypoints[self.nearestIndex,5]) * 0.15
@@ -90,12 +88,11 @@ class myNode(Node):
 	
 	
 	def actuation(self):
-		speed = self.waypoints[self.nearestIndex,7] #+ (self.waypoints[self.nearestIndex+1,7] - self.waypoints[self.nearestIndex,7])*self.t1
+		speed = self.waypoints[self.nearestIndex,7]
 		waypoint = np.dot(np.array([np.sin(-self.pose[2]), np.cos(-self.pose[2])]), self.targetPoint[:2] - self.pose[:2])
 		LD = np.linalg.norm(self.targetPoint[:2] - self.pose[:2])
 		radius = (LD**2) / (2 * waypoint)
 		steering_angle = np.arctan(self.wheel_base / radius)
-		steering_angle = np.clip(steering_angle, -self.max_steering_angle, self.max_steering_angle)
 		return steering_angle, speed
 	
 	

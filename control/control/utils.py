@@ -154,9 +154,12 @@ def nearest_point(point, trajectory):
 
 MIN_STEERING_ANGLE = -0.4
 MAX_STEERING_ANGLE = 0.4
+# MAX_SPEED = 8
+MIN_SPEED = 0
 
-def pubishActuation(steering_angle, speed, cmd_publisher: Publisher):
+def pubishActuation(steering_angle, speed, cmd_publisher: Publisher, max_speed=8):
 	steering_angle = np.clip(steering_angle, MIN_STEERING_ANGLE, MAX_STEERING_ANGLE)
+	speed = np.clip(speed, MIN_SPEED, max_speed)
 
 	cmd = AckermannDriveStamped()
 	cmd.drive.steering_angle = steering_angle

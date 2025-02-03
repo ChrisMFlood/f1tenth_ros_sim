@@ -17,8 +17,12 @@ class myNode(Node):
 		self.declare_parameter("odom_topic","/ego_racecar/odom")
 		# self.declare_parameter("odom_topic","/pf/pose/odom")
 		self.odom_topic = self.get_parameter("odom_topic").value
-		self.declare_parameter("ke", 10.0)
-		self.declare_parameter("kv", 1.0)
+		# self.declare_parameter("ke", 1.0)
+		# self.declare_parameter("kv", 1.0)
+		# self.declare_parameter("dt", 0.1)
+		self.declare_parameter("ke", 0.30)
+		self.declare_parameter("kv", 0.50)
+		self.declare_parameter("dt", 0.1)
 		self.declare_parameter("wheel_base", 0.33)
 		self.declare_parameter("min_speed", 0.1)
 		self.declare_parameter("max_speed", 3.0)
@@ -32,6 +36,7 @@ class myNode(Node):
 		self.max_steering_angle = self.get_parameter("max_steering_angle").value
 		self.map_name = self.get_parameter("map_name").value
 		self.kv = self.get_parameter("kv").value
+		self.dt = self.get_parameter('dt').value
 
 		# Subscribers
 		self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
@@ -89,8 +94,8 @@ class myNode(Node):
 	
 	def actuation(self):
 		speed = self.waypoints[self.targetIndex,7]
-		theta_cte = math.atan2(self.k*self.crossTrackError,self.speed+self.kv)
-		steeringAngle = self.headingError + theta_cte
+		theta_cte = math.atan2(self.crossTrackError,self.k*self.speed+self.kv)
+		steeringAngle = math.atan2(((self.headingError + theta_cte)*self.wheel_base),self.dt*self.speed)
 		print(f'steering angle: {steeringAngle}')
 		return steeringAngle, speed
 

@@ -7,7 +7,6 @@ from ackermann_msgs.msg import AckermannDriveStamped
 import math
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from geometry_msgs.msg import PoseArray
-from sensor_msgs.msg import Joy
 from control import utils as utils
 
 class myNode(Node):
@@ -17,11 +16,11 @@ class myNode(Node):
 		# Parameters
 		self.declare_parameter("odom_topic","/pf/pose/odom")
 		self.odom_topic = self.get_parameter("odom_topic").value
-		self.declare_parameter("ke", 10)
+		self.declare_parameter("ke", 6)
 		self.declare_parameter("kv", 10)
 		self.declare_parameter("wheel_base", 0.33)
 		self.declare_parameter("min_speed", 0.1)
-		self.declare_parameter("max_speed", 8)
+		self.declare_parameter("max_speed", 3)
 		self.declare_parameter("max_steering_angle", 0.4)
 		self.declare_parameter("map_name", "map3")
 
@@ -35,7 +34,6 @@ class myNode(Node):
 
 		# Subscribers
 		self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 10)
-		self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, 10)
 		# Publishers
 		self.cmd_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
 		self.waypoints_pub = self.create_publisher(PoseArray, '/waypoints', 10)
@@ -47,14 +45,12 @@ class myNode(Node):
 		self.calc_ref_traj_pub = self.create_publisher(PoseArray, 'calculated_trajectory', 10)
 
 		# Waypoints
-		self.waypoints = np.loadtxt(f'/home/chris/sim_ws/src/global_planning/maps/{self.map_name}_minCurve.csv', delimiter=',', skiprows=1)
+		self.waypoints = np.loadtxt(f'src/global_planning/maps/{self.map_name}_minCurve.csv', delimiter=',', skiprows=1)
 		utils.publishTrajectory(self.waypoints[:,0], self.waypoints[:,1], self.waypoints[:,4], self.waypoints_pub)
 
 		# Variables  
 
-		self.joy = None
-	def joy_callback(self, msg: Joy):
-		self.joy = msg.buttons[7]
+
 
 	def odom_callback(self, msg: Odometry):
 		self.odom = msg
@@ -68,8 +64,7 @@ class myNode(Node):
 		
 		self.steeringAngle, self.velocity = self.actuation()
 		# print(self.steeringAngle, self.velocity)
-		if self.joy:
-			utils.pubishActuation(self.steeringAngle, self.velocity, self.cmd_pub)
+		utils.pubishActuation(self.steeringAngle, self.velocity, self.cmd_pub, self.max_speed)
 
 	def getCrossTrackError(self):
 		x = self.pose[0] + np.cos(self.pose[2])*self.wheel_base
@@ -79,7 +74,7 @@ class myNode(Node):
 		vec_dist_nearest_point = self.nearest_point_front -  self.frontAxle
 		front_axle_vec_rot_90 = np.array([math.sin(-self.yaw), math.cos(-self.yaw)])
 		crossTrackError = np.dot(front_axle_vec_rot_90,vec_dist_nearest_point)
-		print(f"corsstrack: {crossTrackError}")
+		print(f"crosstrack: {crossTrackError}")
 		return crossTrackError
 	
 	def getHeadingError(self):
@@ -94,14 +89,9 @@ class myNode(Node):
 		return headingError
 	
 	def actuation(self):
-		speed = self.waypoints[self.targetIndex,7] #+ (self.waypoints[self.targetIndex+1,7] - self.waypoints[self.targetIndex,7])*self.t1
-
-		# theta_cte = math.atan2(self.k*self.crossTrackError, self.speed+self.kv)
-		theta_cte = math.atan2(self.k*self.crossTrackError,speed+self.kv)
+		speed = self.waypoints[self.targetIndex,7]
+		theta_cte = math.atan2(self.k*self.crossTrackError,self.speed+self.kv)
 		steeringAngle = self.headingError + theta_cte
-		# steeringAngle = theta_cte
-		# steeringAngle = self.headingError
-		steeringAngle = np.clip(steeringAngle, -self.max_steering_angle, self.max_steering_angle)
 		print(f'steering angle: {steeringAngle}')
 		return steeringAngle, speed
 

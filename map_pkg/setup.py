@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'path_visual'
+package_name = 'map_pkg'
 
 setup(
     name=package_name,
@@ -20,7 +20,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'path_visual = path_visual.visualise_path:main',
         ],
     },
 )
