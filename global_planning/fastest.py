@@ -1,128 +1,94 @@
-import math
-import numpy as np 
-def get_dynamic_model_matrix(self, delta, v, yaw, yawrate, beta, a, vehicle_params):
-    """
-    Calc linear and discrete time dynamic model-> Explicit discrete time-invariant
-    Linear System: Xdot = Ax +Bu + C
-    State vector: x=[x, y, delta, v, yaw, yaw rate, beta]
-    :param delta: steering angle
-    :param v: speed
-    :param phi: heading angle of the vehicle
-    :return: A, B, C
-    """
-    # Extract Vehicle parameter to calculate vehicle dynamic model
-    mass = 3.74 # mass in [kg]
-    l_f = 0.15875  # Distance CoG to front in [m]
-    l_r = 0.17145  # Distance CoG to back in [m]
-    h_CoG = 0.074  # Height of the vehicle in [m]
-    c_f = 4.718  # Cornering Stiffness front in [N]
-    c_r = 5.4562  # Cornering Stiffness back in [N]
-    Iz = 0.04712  # Vehicle Inertia [kg m2]
-    mu = 1.0489  # friction coefficient [-]
-    g = 9.81  # Vertical acceleration  [m/s2]
-    # Calculate substitute/helper variables for all functions
-    K = (mu * mass) / ((l_f + l_r) * Iz)
-    T = (g * l_r) - (a * h_CoG)
-    V = (g * l_f) + (a * h_CoG)
-    F = l_f * c_f
-    R = l_r * c_r
-    M = (mu * c_f) / (l_f + l_r)
-    N = (mu * c_r) / (l_f + l_r)
-    A1 = K * F * T
-    A2 = K * (R * V - F * T)
-    A3 = K * (l_f * l_f * c_f * T + l_r * l_r * c_r * V)
-    A4 = M * T
-    A5 = N * V + M * T
-    A6 = N * V * l_r - M * T * l_f
-    B1 = (
-        (-h_CoG * F * K) * delta
-        + (h_CoG * K * (F + R)) * beta
-        - (h_CoG * K * ((l_r * l_r * c_r) - (l_f * l_f * c_f))) * (yawrate / v)
-    )
-    B2 = (
-        (-h_CoG * M) * (delta / v)
-        - h_CoG * (N - M) * (beta / v)
-        + h_CoG * (l_f * M + l_r * N) * (yawrate / (v * v))
-    )
-    # --------------  State (or system) matrix A, 7x7
-    A = np.zeros((self.config.NX, self.config.NX))
-    # Diagonal
-    A[0, 0] = 1.0
-    A[1, 1] = 1.0
-    A[2, 2] = 1.0
-    A[3, 3] = 1.0
-    A[4, 4] = 1.0
-    A[5, 5] = -self.config.DT * (A3 / v) + 1
-    A[6, 6] = -self.config.DT * A5 + 1
-    # Zero row
-    A[0, 3] = self.config.DT * math.cos(yaw + beta)
-    A[0, 4] = -self.config.DT * v * math.sin(yaw + beta)
-    A[0, 6] = -self.config.DT * v * math.sin(yaw + beta)
-    # First Row
-    A[1, 3] = self.config.DT * math.sin(yaw + beta)
-    A[1, 4] = self.config.DT * v * math.cos(yaw + beta)
-    A[1, 6] = self.config.DT * v * math.cos(yaw + beta)
-    # Fourth Row
-    A[4, 5] = self.config.DT
-    # Fifth Row
-    A[5, 2] = self.config.DT * A1
-    A[5, 3] = self.config.DT * A3 * (yawrate / (v * v))
-    A[5, 6] = self.config.DT * A2
-    # Sixth Row
-    A[6, 2] = self.config.DT * (A4 / v)
-    A[6, 3] = (
-        self.config.DT
-        * (-A4 * beta * v + A5 * beta * v - A6 * 2 * yawrate)
-        / (v * v * v)
-    )
-    A[6, 5] = self.config.DT * ((A6 / (v * v)) - 1)
-    # -------------- Input Matrix B; 7x2
-    B = np.zeros((self.config.NX, self.config.NU))
-    B[2, 0] = self.config.DT
-    B[3, 1] = self.config.DT
-    B[5, 1] = self.config.DT * B1
-    B[6, 1] = self.config.DT * B2
-    # -------------- Matrix C; 7x1
-    C = np.zeros(self.config.NX)
-    C[0] = self.config.DT * (
-        v * math.sin(yaw + beta) * yaw + v * math.sin(yaw + beta) * beta
-    )
-    C[1] = self.config.DT * (
-        -v * math.cos(yaw + beta) * yaw - v * math.cos(yaw + beta) * beta
-    )
-    C[5] = self.config.DT * (-A3 * (yawrate / v) - B1 * a)
-    C[6] = self.config.DT * (
-        ((A4 * delta * v - A5 * beta * v + A6 * 2 * yawrate) / (v * v)) - B2 * a
-    )
-    return A, B, C
+from sympy import *
+import numpy
+import pickle
+import os
 
-def get_kinematic_model_matrix(self, v, phi, delta):
-    """
-    Calc linear and discrete time dynamic model-> Explicit discrete time-invariant
-    Linear System: Xdot = Ax +Bu + C
-    State vector: x=[x, y, v, yaw]
-    :param v: speed
-    :param phi: heading angle of the vehicle
-    :param delta: steering angle: delta_bar
-    :return: A, B, C
-    """
-    # State (or system) matrix A, 4x4
-    A = np.zeros((self.config.NXK, self.config.NXK))
-    A[0, 0] = 1.0
-    A[1, 1] = 1.0
-    A[2, 2] = 1.0
-    A[3, 3] = 1.0
-    A[0, 2] = self.config.DTK * math.cos(phi)
-    A[0, 3] = -self.config.DTK * v * math.sin(phi)
-    A[1, 2] = self.config.DTK * math.sin(phi)
-    A[1, 3] = self.config.DTK * v * math.cos(phi)
-    A[3, 2] = self.config.DTK * math.tan(delta) / self.config.WB
-    # Input Matrix B; 4x2
-    B = np.zeros((self.config.NXK, self.config.NU))
-    B[2, 0] = self.config.DTK
-    B[3, 1] = self.config.DTK * v / (self.config.WB * math.cos(delta) ** 2)
-    C = np.zeros(self.config.NXK)
-    C[0] = self.config.DTK * v * math.sin(phi) * phi
-    C[1] = -self.config.DTK * v * math.cos(phi) * phi
-    C[3] = -self.config.DTK * v * delta / (self.config.WB * math.cos(delta) ** 2)
-    return A, B, C
+
+# Symbols and matrices definition
+lr, L = symbols('l_r L')
+dt, l, ds = symbols('Delta_t l Delta_s')
+kappa = symbols('kappa')
+s, n, mu = symbols('s n mu')
+v, delta = symbols('v delta')
+
+X = Matrix([n, mu])
+U = Matrix([v, delta])
+
+# Linearized state and control
+s0, n0, mu0,  = symbols('s_0 n_0 mu_0')
+v0, delta0 = symbols('v_0 delta_0')
+
+Xs = Matrix([n0, mu0])
+Us = Matrix([v0, delta0])
+
+
+def state_function_t(X, U):
+    beta = atan((lr / L) * tan(U[1]))
+    vx = U[0] * cos(beta)
+    vy = U[0] * sin(beta)
+    phi_dot = U[0] / L * tan(U[1]) * cos(beta)
+    A = Matrix([
+        [(vx*sin(X[1]) - vy*cos(X[1]))],
+        [phi_dot-(vx*cos(X[1]) - vy*sin(X[1]))/(1-X[0]*kappa)*kappa]])
+    return simplify(A*(1/((vx*cos(X[1]) - vy*sin(X[1]))/(1-X[0]*kappa))))
+
+def state_function(X, U):
+    f = state_function_t(X, U)
+    X_k = X + f * ds
+    return X_k
+
+# Convert a tensor to a matrix
+def tensor_to_matrix(tensor):
+    return Matrix([
+
+        [tensor[0][0][0], tensor[0][1][0]],
+        [tensor[0][1][0], tensor[1][1][0]]
+        
+    ])
+
+
+def get_model_matrix():
+    file_path = "/home/chris/sim_ws/src/global_planning/symbolic_matrices.pkl"
+
+    if os.path.exists(file_path):
+        # Load symbolic matrices if the file exists
+        with open(file_path, "rb") as f:
+            matrices = pickle.load(f)
+
+        AA = matrices["AA"]
+        BB = matrices["BB"]
+        CC = matrices["CC"]
+
+        print("Symbolic matrices loaded successfully!")
+    else:
+        # Calculate state and linearized form
+        f = state_function(X, U)
+        fs = state_function(Xs, Us)
+
+        # Derivatives for linearization
+        df_x = simplify(tensor_to_matrix(diff(fs, Xs.T)[0]))
+        df_u = simplify(tensor_to_matrix(diff(fs, Us.T)[0]))
+
+        # Linearized state function
+        f_l = fs + df_x * (X - Xs) + df_u * (U - Us)
+        f_l_simplified = simplify(f_l)
+
+        AA = simplify(df_x)
+        BB = simplify(df_u)
+        CC = simplify(df_x * (-Xs) + df_u * (-Us) + fs)
+
+        # Save symbolic matrices
+        with open(file_path, "wb") as f:
+            pickle.dump({"AA": AA, "BB": BB, "CC": CC}, f)
+
+        print("Symbolic matrices saved successfully!")
+
+    return AA, BB, CC
+
+
+def main():
+    A, B, C = get_model_matrix()
+
+
+if __name__ == '__main__':
+	main()

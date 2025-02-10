@@ -37,7 +37,7 @@ class Track:
 
 		if not os.path.exists(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short.csv"):
 			generateShortestPath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
-			generateMinCurvaturePath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
+			# generateMinCurvaturePath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
 
 		if not os.path.exists(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_minCurve.csv"):
 			generateMinCurvaturePath(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv")
@@ -46,11 +46,12 @@ class Track:
 
 		map_yaml_path = f"/home/chris/sim_ws/src/global_planning/maps/{map_name}.yaml"
 		map_img = plt.imread(f'/home/chris/sim_ws/src/global_planning/maps/{map_name}.png')
+
 		centreline = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_centreline.csv", delimiter=',')
-		# smoothed_centreline = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/smooth_test/{map_name}_centerline.csv", delimiter=',')
 		short = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_short.csv", delimiter=',')
 		minCurve = np.loadtxt(f"maps/{map_name}_minCurve.csv", delimiter=',')
-		# shortMinCurve = np.loadtxt(f"/home/chris/sim_ws/src/global_planning/maps/{map_name}_minCurve.csv", delimiter=',')
+
+
 		# flip the image around x axis
 		map_img = np.flipud(map_img)
 		map_img = scipy.ndimage.distance_transform_edt(map_img)
@@ -88,7 +89,7 @@ class Track:
 		plt.figure( num=f'{map_name}_curvature')
 		plt.title(f'Curvature vs Distance {map_name}')
 		plt.plot(centrelineS, centreline[:, 5], label='Centreline')
-		plt.plot(shortS, short[:, 5], label='Shortest Path', linestyle='None',  marker='o')
+		plt.plot(shortS, short[:, 5], label='Shortest Path')
 		plt.plot(minCurveS, minCurve[:, 5], label='Minimum Curvature')
 		plt.legend(loc='upper right')
 		plt.savefig(f"{output_dir}/{map_name}_curvature.png")
@@ -97,7 +98,7 @@ class Track:
 		plt.figure( num=f'{map_name}_heading')
 		plt.title(f'Heading vs Distance {map_name}')
 		plt.plot(centrelineS, centreline[:, 4], label='Centreline')
-		plt.plot(shortS, short[:, 4], label='Shortest Path', linestyle='None',  marker='o')
+		plt.plot(shortS, short[:, 4], label='Shortest Path')
 		plt.plot(minCurveS, minCurve[:, 4], label='Minimum Curvature')
 		plt.legend(loc='upper right')
 		plt.savefig(f"{output_dir}/{map_name}_heading.png")
@@ -106,7 +107,7 @@ class Track:
 		plt.figure( num=f'{map_name}_velocity')
 		plt.title(f'Velocity vs Distance {map_name}')
 		plt.plot(centrelineS, centreline[:, 7], label='Centreline')
-		plt.plot(shortS, short[:, 7], label='Shortest Path', linestyle='None',  marker='o')
+		plt.plot(shortS, short[:, 7], label='Shortest Path')
 		plt.plot(minCurveS, minCurve[:, 7], label='Minimum Curvature')
 		plt.legend(loc='upper right')
 		plt.savefig(f"{output_dir}/{map_name}_velocity.png")
@@ -122,17 +123,17 @@ class Track:
 		y -= self.orig_y
 		x /= self.map_resolution
 		y /= self.map_resolution
-		normS = s/s[-1]
+		normS = (s-s[0])/(s[-1]-s[0])
 		return x, y, normS
 
 	
 
 def main():
 	for file in os.listdir('/home/chris/sim_ws/src/global_planning/maps/'):
-		if file.endswith('.pgm'):
-			map_name = file.split('.')[0]
-			print(f"Extracting data for: {map_name}")
-			track = Track(map_name)
+		# if file.endswith('.pgm'):
+		# 	map_name = file.split('.')[0]
+		# 	print(f"Extracting data for: {map_name}")
+		# 	track = Track(map_name)
 		if file.endswith('.png'):
 			map_name = file.split('.')[0]
 			print(f"Extracting data for: {map_name}")

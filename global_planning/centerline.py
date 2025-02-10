@@ -14,6 +14,19 @@ import utils
 # Constants
 TRACK_WIDTH_MARGIN = 0.0 # Extra Safety margin, in meters
 
+class Point:
+	def __init__(self, x, y):
+		self.x = x
+		self.y = y
+		self.parent = None
+		# self.width = centerline_dist[self.y][self.x]
+
+	def __eq__(self, other):
+		return isinstance(other, Point) and self.x == other.x and self.y == other.y
+
+	def __hash__(self):
+		return hash((self.x, self.y))  # Allow using Point as a dictionary key
+
 # Modified from https://github.com/CL2-UWaterloo/Head-to-Head-Autonomous-Racing/blob/main/gym/f110_gym/envs/laser_models.py
 # load map image
 def getCentreLine(map_name):
@@ -69,9 +82,9 @@ def getCentreLine(map_name):
 	# 	THRESHOLD = 0.50
 	# centers = dist_transform > THRESHOLD*dist_transform.max()
 	centers = dist_transform > THRESHOLD
-	if map_name == 'map3' or map_name == 'fourthfloor':
-		THRESHOLD = 0.6
-		centers = dist_transform > THRESHOLD*dist_transform.max()
+	# if map_name == 'map3' or map_name == 'fourthfloor':
+	# 	THRESHOLD = 0.6
+	# 	centers = dist_transform > THRESHOLD*dist_transform.max()
 	# print(centers)
 	# plt.imshow(map_img, origin='lower', cmap='gray')
 	# plt.imshow(centers, origin='lower', cmap='gray')
@@ -93,29 +106,110 @@ def getCentreLine(map_name):
 	distanceToStartTransform = scipy.ndimage.distance_transform_edt(distanceToStart_img)
 	distanceToStart = np.where(centerline, distanceToStartTransform, distanceToStartTransform+200)
 	start_point = np.unravel_index(np.argmin(distanceToStart, axis=None), distanceToStart.shape)
-	starting_point = (start_point[1], start_point[0])
+	starting_point = Point(start_point[1], start_point[0])
 
 	sys.setrecursionlimit(20000)
 
 	NON_EDGE = 0.0
 	visited = {}
-	centerline_points = []
+	centerline_nodes = []
 	track_widths = []
-	# DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+	DIRECTIONS = [(0, 1), (1, 0), (0, -1), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
 	# If you want the other direction first
-	DIRECTIONS = [(0, -1), (-1, 0),  (0, 1), (1, 0), (-1, 1), (-1, -1), (1, 1), (1, -1) ]
+	# DIRECTIONS = [(0, -1), (-1, 0),  (0, 1), (1, 0), (-1, 1), (-1, -1), (1, 1), (1, -1) ]
+	finalPoints = []
+	
 
-	def dfs(point):
-		if (point in visited): return
+	def dfs(point: Point, parent: Point = None):
+	
+		if point in visited:
+			return
+		if not (0 <= point.x < len(centerline_dist[0]) and 0 <= point.y < len(centerline_dist)):
+			return  # Avoid out-of-bounds access
+	
+		if centerline_dist[point.y][point.x] == NON_EDGE:
+			return  # Skip non-track areas
+	
+		point.parent = parent
 		visited[point] = True
-		centerline_points.append(np.array(point))
-		track_widths.append(np.array([centerline_dist[point[1]][point[0]], centerline_dist[point[1]][point[0]]]))
+	
+		centerline_nodes.append(point)
+		# track_widths.append(np.array([centerline_dist[point.y][point.x], centerline_dist[point.y][point.x]]))
+	
 		for direction in DIRECTIONS:
-			if (centerline_dist[point[1] + direction[1]][point[0] + direction[0]] != NON_EDGE and (point[0] + direction[0], point[1] + direction[1]) not in visited):
-				dfs((point[0] + direction[0], point[1] + direction[1]))
+			newPoint = Point(point.x + direction[0], point.y + direction[1])
+	
+	
+			# Check if we returned to the start
+			if newPoint.x == starting_point.x and newPoint.y == starting_point.y:
+				print(point.x, point.y)
+				print("Returned to start")
+				finalPoints.append(point)
 				return
+	
+			if newPoint not in visited:
+				dfs(newPoint, point)
+				# return
+			# print('done for loop')
 
-	dfs(starting_point)
+	def iterative_dfs(starting_point: Point):
+		stack = [starting_point]  # Stack stores points to visit
+		visited[(starting_point.x,starting_point.y)] = True  # Track visited points and their parents
+	
+		while stack:
+			point = stack.pop()
+	
+			if not (0 <= point.x < len(centerline_dist[0]) and 0 <= point.y < len(centerline_dist)):
+				continue  # Avoid out-of-bounds access
+			if centerline_dist[point.y][point.x] == NON_EDGE:
+				continue  # Skip non-track areas
+			
+			centerline_nodes.append(point)
+	
+			for direction in DIRECTIONS:
+				newPoint = Point(point.x + direction[0], point.y + direction[1])
+	
+	
+				if not (0 <= newPoint.x < len(centerline_dist[0]) and 0 <= newPoint.y < len(centerline_dist)):
+					continue  # Ensure within bounds
+				if centerline_dist[newPoint.y][newPoint.x] == NON_EDGE:
+					continue  # Skip non-track areas
+				
+				if visited.get((newPoint.x, newPoint.y)):
+					if newPoint.x == starting_point.x and newPoint.y == starting_point.y and len(centerline_nodes) > 3:
+						print(f"Returned to start at ({newPoint.x}, {newPoint.y})")
+						newPoint.parent = point
+						centerline_nodes.append(newPoint)
+						# break
+						return
+					continue
+				else:
+					newPoint.parent = point
+					stack.append(newPoint)
+					visited[(newPoint.x, newPoint.y)] = True
+					break
+
+	iterative_dfs(starting_point)
+	print(f"Number of centerline points: {len(centerline_nodes)}")
+
+	# Ensure finalPoints is not empty before accessing
+	# finalPoint = finalPoints[0]
+	finalPoint = centerline_nodes[-1]
+	print(f"Final point: ({finalPoint.x}, {finalPoint.y})")
+
+	# Backtrace to reconstruct the centerline path
+	centerline_points = [(finalPoint.x, finalPoint.y)]
+	track_widths = [np.array([centerline_dist[finalPoint.y][finalPoint.x], centerline_dist[finalPoint.y][finalPoint.x]])]
+
+	while finalPoint.parent is not None:
+		finalPoint = finalPoint.parent
+		centerline_points.append((finalPoint.x, finalPoint.y))
+		track_widths.append(np.array([centerline_dist[finalPoint.y][finalPoint.x], centerline_dist[finalPoint.y][finalPoint.x]]))
+
+	# centerline_points.reverse()  # Ensure correct start-to-end order
+	# track_widths.reverse()
+	
+	print(f"Final Centerline Path Length: {len(centerline_points)}")
 
 	track_widths_np = np.array(track_widths)
 	waypoints = np.array(centerline_points)
@@ -143,7 +237,7 @@ def getCentreLine(map_name):
 	# Safety margin
 	transformed_data -= np.array([0, 0, TRACK_WIDTH_MARGIN, TRACK_WIDTH_MARGIN])
 
-	transformed_data = utils.spline_approximation(transformed_data,3, 5, 0.05, 0.05, True)
+	transformed_data = utils.spline_approximation(transformed_data,4, 5, 0.05, 0.05, True)
 
 	transformed_track = utils.trajectroy(transformed_data)
 

@@ -399,6 +399,7 @@ class MPC(Node):
 		constraints += [self.xk[2, :] >= self.MIN_SPEED]
 		constraints += [cvxpy.abs(self.uk[0, :]) <= self.MAX_ACCEL]
 		constraints += [cvxpy.abs(self.uk[1, :]) <= self.MAX_STEER]
+		
 
 		# # Add constraint to ensure self.xk is valid on an occupancy grid
 		# for t in range(self.TK + 1):
